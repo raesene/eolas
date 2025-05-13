@@ -24,6 +24,27 @@ If you prefer to install from source:
 go install github.com/raesene/eolas@latest
 ```
 
+## Generating Kubernetes Configuration JSON
+
+To generate the JSON configuration file for ingestion into Eolas, use the following `kubectl` command:
+
+```bash
+kubectl get $(kubectl api-resources --verbs=list -o name | grep -v -e "secrets" -e "componentstatuses" -e "priorityclass" -e "events" | paste -sd, -) --ignore-not-found --all-namespaces -o json > cluster-config.json
+```
+
+This command:
+
+1. Gets a list of all available API resources that support the `list` verb
+2. Excludes sensitive or high-volume resources (secrets, componentstatuses, priorityclass, events)
+3. Retrieves all instances of these resources across all namespaces
+4. Outputs the result as a single JSON file
+
+After generating the JSON file, you can ingest it into Eolas:
+
+```bash
+eolas ingest -f cluster-config.json -n my-cluster
+```
+
 ## Usage
 
 ```
