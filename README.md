@@ -87,3 +87,22 @@ make help      # Show help message
 - Display resource counts by kind
 - Store configurations for later analysis
 - List stored configurations
+
+## Releases
+
+The project uses GitHub Actions with GoReleaser to automatically build and publish releases. When a new tag is pushed, GoReleaser will build binaries for multiple platforms and publish them as a GitHub release.
+
+To create a new release:
+
+```bash
+# Update code and commit changes
+git commit -am "Your changes"
+
+# Tag a new version
+git tag -a v0.1.0 -m "First release"
+
+# Push tag to GitHub
+git push origin v0.1.0
+```
+
+The GitHub Action will automatically build and publish the release.

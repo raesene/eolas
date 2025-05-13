@@ -7,6 +7,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version information set by build flags
+var (
+	version = "dev"
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "eolas",
 	Short: "Eolas is a command line utility for analyzing Kubernetes clusters",
@@ -16,6 +21,7 @@ It ingests JSON files containing Kubernetes resources and provides analysis capa
 For more information visit: https://github.com/raesene/eolas`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Welcome to Eolas - Kubernetes Cluster Analyzer")
+		fmt.Println("Version:", version)
 		fmt.Println("\nUse the following commands:")
 		fmt.Println("  eolas ingest -f <json-file>  - Ingest a Kubernetes cluster configuration")
 		fmt.Println("  eolas list                   - List stored configurations")
