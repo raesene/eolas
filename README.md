@@ -4,6 +4,22 @@ Eolas is a command line utility for analyzing Kubernetes cluster configurations.
 
 ## Installation
 
+### Download Pre-built Binaries
+
+Pre-built binaries for Linux, macOS, and Windows are available on the [GitHub Releases page](https://github.com/raesene/eolas/releases).
+
+1. Navigate to the [Releases page](https://github.com/raesene/eolas/releases)
+2. Download the appropriate binary for your platform:
+   - `eolas_Linux_x86_64.tar.gz` for Linux (64-bit)
+   - `eolas_Darwin_x86_64.tar.gz` for macOS (Intel)
+   - `eolas_Darwin_arm64.tar.gz` for macOS (Apple Silicon)
+   - `eolas_Windows_x86_64.zip` for Windows (64-bit)
+3. Extract the binary and place it in your PATH
+
+### Install from Source
+
+If you prefer to install from source:
+
 ```
 go install github.com/raesene/eolas@latest
 ```
