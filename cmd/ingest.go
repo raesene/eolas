@@ -15,6 +15,7 @@ var (
 	inputFile    string
 	clusterName  string
 	storageDir   string
+	useHomeDir   bool
 )
 
 var ingestCmd = &cobra.Command{
@@ -65,20 +66,36 @@ var ingestCmd = &cobra.Command{
 			fmt.Printf("  %s: %d\n", kind, count)
 		}
 
-		// Store configuration if storage directory is specified
+		// Determine storage directory
+		var storeDir string
 		if storageDir != "" {
-			store, err := storage.NewFileStore(storageDir)
+			// Use explicitly provided storage directory
+			storeDir = storageDir
+		} else if useHomeDir {
+			// Use .eolas in home directory
+			homeDir, err := os.UserHomeDir()
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error creating file store: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Error determining home directory: %v\n", err)
 				os.Exit(1)
 			}
-
-			if err := store.SaveConfig(config, clusterName); err != nil {
-				fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Printf("Configuration saved as '%s'\n", clusterName)
+			storeDir = filepath.Join(homeDir, ".eolas")
+		} else {
+			// Use default .eolas in current directory
+			storeDir = ".eolas"
 		}
+
+		// Store configuration
+		store, err := storage.NewFileStore(storeDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating file store: %v\n", err)
+			os.Exit(1)
+		}
+
+		if err := store.SaveConfig(config, clusterName); err != nil {
+			fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Configuration saved as '%s' in %s\n", clusterName, storeDir)
 	},
 }
 
@@ -102,6 +119,7 @@ func init() {
 	rootCmd.AddCommand(ingestCmd)
 	ingestCmd.Flags().StringVarP(&inputFile, "file", "f", "", "JSON file containing Kubernetes cluster configuration (required)")
 	ingestCmd.Flags().StringVarP(&clusterName, "name", "n", "", "Name to identify the cluster configuration (defaults to timestamp)")
-	ingestCmd.Flags().StringVarP(&storageDir, "storage-dir", "s", ".eolas", "Directory to store parsed configurations")
+	ingestCmd.Flags().StringVarP(&storageDir, "storage-dir", "s", "", "Directory to store parsed configurations (defaults to .eolas in home directory)")
+	ingestCmd.Flags().BoolVarP(&useHomeDir, "use-home", "", true, "Store configurations in .eolas directory in user's home directory")
 	ingestCmd.MarkFlagRequired("file")
 }

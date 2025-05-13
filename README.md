@@ -41,7 +41,8 @@ eolas ingest -f <path-to-json-file> -n <cluster-name>
 Options:
 - `-f, --file` - Path to the JSON file containing Kubernetes cluster configuration (required)
 - `-n, --name` - Name to identify the cluster configuration (defaults to timestamp)
-- `-s, --storage-dir` - Directory to store parsed configurations (defaults to .eolas)
+- `-s, --storage-dir` - Directory to store parsed configurations (defaults to .eolas in home directory)
+- `--use-home` - Whether to use the home directory for storage (defaults to true)
 
 Example:
 ```
@@ -55,7 +56,8 @@ eolas list
 ```
 
 Options:
-- `-s, --storage-dir` - Directory where configurations are stored (defaults to .eolas)
+- `-s, --storage-dir` - Directory where configurations are stored (defaults to .eolas in home directory)
+- `--use-home` - Whether to use the home directory for storage (defaults to true)
 
 ## Development
 
