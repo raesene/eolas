@@ -59,6 +59,22 @@ Options:
 - `-s, --storage-dir` - Directory where configurations are stored (defaults to .eolas in home directory)
 - `--use-home` - Whether to use the home directory for storage (defaults to true)
 
+#### Analyze a Cluster Configuration
+
+```
+eolas analyze -n <cluster-name>
+```
+
+Options:
+- `-n, --name` - Name of the cluster configuration to analyze (required)
+- `-s, --storage-dir` - Directory where configurations are stored (defaults to .eolas in home directory)
+- `--use-home` - Whether to use the home directory for storage (defaults to true)
+
+Example:
+```
+eolas analyze -n kind-cluster
+```
+
 ## Development
 
 ```
@@ -105,6 +121,8 @@ make help      # Show help message
 - Display resource counts by kind
 - Store configurations for later analysis
 - List stored configurations
+- Analyze cluster configurations for detailed insights
+  - Resource type counts and distributions
 
 ## Releases
 
