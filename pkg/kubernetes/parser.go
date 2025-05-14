@@ -43,6 +43,18 @@ type CapabilityContainer struct {
 	Capabilities []string
 }
 
+// HostNamespaceWorkload represents a workload using host namespaces
+type HostNamespaceWorkload struct {
+	Name            string
+	Namespace       string
+	Kind            string
+	HostPID         bool
+	HostIPC         bool
+	HostNetwork     bool
+	HostPorts       []int
+	ContainerNames  []string
+}
+
 // GetPrivilegedContainers identifies containers running with privileged security context
 func GetPrivilegedContainers(config *ClusterConfig) []PrivilegedContainer {
 	var results []PrivilegedContainer
@@ -244,4 +256,160 @@ func checkContainersForCapabilities(containers []interface{}, ownerName, namespa
 			}
 		}
 	}
+}
+
+// GetHostNamespaceWorkloads identifies workloads using host namespaces
+func GetHostNamespaceWorkloads(config *ClusterConfig) []HostNamespaceWorkload {
+	var results []HostNamespaceWorkload
+	
+	// Process all items in the cluster configuration
+	for _, item := range config.Items {
+		// Look for pod-related resources
+		switch item.Kind {
+		case "Pod":
+			// Direct Pod resources
+			checkPodForHostNamespaces(item, item.Metadata.Name, item.Metadata.Namespace, item.Kind, &results)
+		case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob":
+			// Resources that create pods
+			checkWorkloadForHostNamespaces(item, &results)
+		}
+	}
+	
+	return results
+}
+
+// checkPodForHostNamespaces examines a pod for host namespace usage
+func checkPodForHostNamespaces(item Item, name, namespace, kind string, results *[]HostNamespaceWorkload) {
+	if spec, ok := item.Spec.(map[string]interface{}); ok {
+		var hostNamespaceUsed bool
+		workload := HostNamespaceWorkload{
+			Name:      name,
+			Namespace: namespace,
+			Kind:      kind,
+		}
+		
+		// Check for host PID namespace
+		if hostPID, ok := spec["hostPID"].(bool); ok && hostPID {
+			workload.HostPID = true
+			hostNamespaceUsed = true
+		}
+		
+		// Check for host IPC namespace
+		if hostIPC, ok := spec["hostIPC"].(bool); ok && hostIPC {
+			workload.HostIPC = true
+			hostNamespaceUsed = true
+		}
+		
+		// Check for host network namespace
+		if hostNetwork, ok := spec["hostNetwork"].(bool); ok && hostNetwork {
+			workload.HostNetwork = true
+			hostNamespaceUsed = true
+		}
+		
+		// Collect container names and check for host ports
+		if containers, ok := spec["containers"].([]interface{}); ok {
+			checkContainersForHostPorts(containers, &workload)
+		}
+		
+		// Check init containers if they exist
+		if initContainers, ok := spec["initContainers"].([]interface{}); ok {
+			checkContainersForHostPorts(initContainers, &workload)
+		}
+		
+		// Only append if any host namespace is used or host ports are used
+		if hostNamespaceUsed || len(workload.HostPorts) > 0 {
+			*results = append(*results, workload)
+		}
+	}
+}
+
+// checkWorkloadForHostNamespaces examines workload resources for host namespace usage
+func checkWorkloadForHostNamespaces(item Item, results *[]HostNamespaceWorkload) {
+	workloadName := item.Metadata.Name
+	namespace := item.Metadata.Namespace
+	kind := item.Kind
+	
+	// Navigate to pod spec based on resource type
+	if spec, ok := item.Spec.(map[string]interface{}); ok {
+		// For CronJob, need to go through jobTemplate
+		if kind == "CronJob" {
+			if jobTemplate, ok := spec["jobTemplate"].(map[string]interface{}); ok {
+				if jobSpec, ok := jobTemplate["spec"].(map[string]interface{}); ok {
+					spec = jobSpec // Update spec to job spec
+				}
+			}
+		}
+		
+		// Get template for all workload types
+		if template, ok := spec["template"].(map[string]interface{}); ok {
+			if podSpec, ok := template["spec"].(map[string]interface{}); ok {
+				// Create a mock Pod item to reuse the pod checking logic
+				mockPod := Item{
+					Kind: kind,
+					Metadata: Metadata{
+						Name:      workloadName,
+						Namespace: namespace,
+					},
+					Spec: podSpec,
+				}
+				
+				checkPodForHostNamespaces(mockPod, workloadName, namespace, kind, results)
+			}
+		}
+	}
+}
+
+// checkContainersForHostPorts examines containers for host port mappings
+func checkContainersForHostPorts(containers []interface{}, workload *HostNamespaceWorkload) {
+	for _, c := range containers {
+		container, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		
+		containerName, _ := container["name"].(string)
+		
+		// Add container name to the list if not already present
+		if !containsString(workload.ContainerNames, containerName) && containerName != "" {
+			workload.ContainerNames = append(workload.ContainerNames, containerName)
+		}
+		
+		// Check for host ports in container port mappings
+		if ports, ok := container["ports"].([]interface{}); ok {
+			for _, p := range ports {
+				port, ok := p.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				
+				// Check for hostPort setting
+				if hostPort, ok := port["hostPort"].(float64); ok && hostPort > 0 {
+					hostPortInt := int(hostPort)
+					if !containsInt(workload.HostPorts, hostPortInt) {
+						workload.HostPorts = append(workload.HostPorts, hostPortInt)
+					}
+				}
+			}
+		}
+	}
+}
+
+// containsString checks if a string is in a slice
+func containsString(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// containsInt checks if an int is in a slice
+func containsInt(slice []int, item int) bool {
+	for _, i := range slice {
+		if i == item {
+			return true
+		}
+	}
+	return false
 }

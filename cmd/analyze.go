@@ -12,12 +12,13 @@ import (
 )
 
 var (
-	analyzeClusterName    string
-	analyzeStorageDir     string
-	analyzeUseHomeDir     bool
-	securityAnalysisFlag  bool
-	privilegedAnalysisFlag bool
-	capabilityAnalysisFlag bool
+	analyzeClusterName        string
+	analyzeStorageDir         string
+	analyzeUseHomeDir         bool
+	securityAnalysisFlag      bool
+	privilegedAnalysisFlag    bool
+	capabilityAnalysisFlag    bool
+	hostNamespaceAnalysisFlag bool
 )
 
 var analyzeCmd = &cobra.Command{
@@ -71,7 +72,7 @@ var analyzeCmd = &cobra.Command{
 		}
 
 		// Security analysis
-		if securityAnalysisFlag || privilegedAnalysisFlag || capabilityAnalysisFlag {
+		if securityAnalysisFlag || privilegedAnalysisFlag || capabilityAnalysisFlag || hostNamespaceAnalysisFlag {
 			// If any security flag is enabled, show security analysis header
 			fmt.Println("Security Analysis:")
 			fmt.Println("=================")
@@ -84,6 +85,11 @@ var analyzeCmd = &cobra.Command{
 			// Capability analysis
 			if securityAnalysisFlag || capabilityAnalysisFlag {
 				showCapabilityContainers(config)
+			}
+			
+			// Host namespace analysis
+			if securityAnalysisFlag || hostNamespaceAnalysisFlag {
+				showHostNamespaceWorkloads(config)
 			}
 		}
 	},
@@ -203,6 +209,73 @@ func joinStrings(strs []string, sep string) string {
 	return result
 }
 
+// showHostNamespaceWorkloads displays workloads using host namespaces
+func showHostNamespaceWorkloads(config *kubernetes.ClusterConfig) {
+	workloads := kubernetes.GetHostNamespaceWorkloads(config)
+	
+	fmt.Println("Workloads Using Host Namespaces:")
+	fmt.Println("===============================")
+	
+	if len(workloads) == 0 {
+		fmt.Println("No workloads using host namespaces found in the cluster.")
+		fmt.Println()
+		return
+	}
+	
+	fmt.Printf("Found %d workloads using host namespaces\n\n", len(workloads))
+	
+	// Print table header
+	fmt.Printf("%-20s %-15s %-20s %-15s %-15s %-15s %s\n", 
+		"NAMESPACE", "RESOURCE TYPE", "NAME", "HOST PID", "HOST IPC", "HOST NETWORK", "HOST PORTS")
+	fmt.Printf("%-20s %-15s %-20s %-15s %-15s %-15s %s\n", 
+		"---------", "------------", "----", "--------", "--------", "------------", "----------")
+	
+	// Print each workload
+	for _, w := range workloads {
+		namespace := w.Namespace
+		if namespace == "" {
+			namespace = "default"
+		}
+		
+		// Format ports array for display
+		portsStr := ""
+		if len(w.HostPorts) > 0 {
+			if len(w.HostPorts) <= 3 {
+				for i, port := range w.HostPorts {
+					if i > 0 {
+						portsStr += ", "
+					}
+					portsStr += fmt.Sprintf("%d", port)
+				}
+			} else {
+				// If more than 3 ports, show first 3 and count of remaining
+				for i := 0; i < 3; i++ {
+					if i > 0 {
+						portsStr += ", "
+					}
+					portsStr += fmt.Sprintf("%d", w.HostPorts[i])
+				}
+				portsStr += fmt.Sprintf(", +%d more", len(w.HostPorts)-3)
+			}
+		} else {
+			portsStr = "None"
+		}
+		
+		fmt.Printf("%-20s %-15s %-20s %-15t %-15t %-15t %s\n", 
+			namespace, w.Kind, w.Name, w.HostPID, w.HostIPC, w.HostNetwork, portsStr)
+	}
+	
+	fmt.Println()
+	fmt.Println("Note: Host namespaces provide containers with access to the host's resources.")
+	fmt.Println("These pose significant security risks because they reduce isolation between")
+	fmt.Println("containers and the host system. Each namespace type has specific security implications:")
+	fmt.Println("- hostPID: Allows visibility of all processes on the host system")
+	fmt.Println("- hostIPC: Enables shared memory access with the host and all containers")
+	fmt.Println("- hostNetwork: Provides direct access to the host's network interfaces")
+	fmt.Println("- hostPorts: Exposes ports directly on the host's network interfaces")
+	fmt.Println()
+}
+
 func init() {
 	rootCmd.AddCommand(analyzeCmd)
 	analyzeCmd.Flags().StringVarP(&analyzeClusterName, "name", "n", "", "Name of the cluster configuration to analyze (required)")
@@ -211,5 +284,6 @@ func init() {
 	analyzeCmd.Flags().BoolVar(&securityAnalysisFlag, "security", false, "Run security-focused analysis on the cluster configuration")
 	analyzeCmd.Flags().BoolVar(&privilegedAnalysisFlag, "privileged", false, "Check for privileged containers in the cluster configuration")
 	analyzeCmd.Flags().BoolVar(&capabilityAnalysisFlag, "capabilities", false, "Check for containers with added Linux capabilities")
+	analyzeCmd.Flags().BoolVar(&hostNamespaceAnalysisFlag, "host-namespaces", false, "Check for workloads using host namespaces")
 	analyzeCmd.MarkFlagRequired("name")
 }
