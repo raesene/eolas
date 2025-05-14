@@ -94,6 +94,8 @@ Options:
 - `--privileged` - Check for privileged containers in the cluster configuration
 - `--capabilities` - Check for containers with added Linux capabilities
 - `--host-namespaces` - Check for workloads using host namespaces
+- `--html` - Generate HTML output
+- `-o, --output` - File to write output to (default is stdout)
 
 Examples:
 ```bash
@@ -111,6 +113,12 @@ eolas analyze -n kind-cluster --capabilities
 
 # Specific security analysis for workloads using host namespaces
 eolas analyze -n kind-cluster --host-namespaces
+
+# Generate an HTML report and save to file
+eolas analyze -n kind-cluster --html -o cluster-report.html
+
+# Generate a comprehensive HTML security report
+eolas analyze -n kind-cluster --security --html -o security-report.html
 ```
 
 ## Development
@@ -207,6 +215,28 @@ Run all security checks at once using the `--security` flag:
 ```bash
 eolas analyze -n my-cluster --security
 ```
+
+## HTML Reports
+
+Eolas can generate interactive HTML reports with all analysis results. These reports include:
+
+- Overview dashboard with resource counts and security findings
+- Tabbed interface for easy navigation between different analysis types
+- Color-coded tables for better visualization of security issues
+- Responsive design that works on all devices
+- Embedded CSS and JavaScript (no external dependencies)
+
+Generate HTML reports using the `--html` flag:
+
+```bash
+# Generate a basic HTML report
+eolas analyze -n my-cluster --html -o report.html
+
+# Generate a comprehensive security report
+eolas analyze -n my-cluster --security --html -o security-report.html
+```
+
+The HTML reports are self-contained single files that can be easily shared and viewed in any web browser.
 
 ## Releases
 

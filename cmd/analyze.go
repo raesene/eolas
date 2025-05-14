@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/raesene/eolas/pkg/kubernetes"
+	"github.com/raesene/eolas/pkg/output"
 	"github.com/raesene/eolas/pkg/storage"
 	"github.com/spf13/cobra"
 )
@@ -19,6 +21,8 @@ var (
 	privilegedAnalysisFlag    bool
 	capabilityAnalysisFlag    bool
 	hostNamespaceAnalysisFlag bool
+	htmlOutputFlag            bool
+	outputFileFlag            string
 )
 
 var analyzeCmd = &cobra.Command{
@@ -64,10 +68,71 @@ var analyzeCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
+		// Get resource counts for all analysis types
+		resourceCounts := kubernetes.GetResourceCounts(config)
+		
+		// Collect security analysis data if needed for any output format
+		var privilegedContainers []kubernetes.PrivilegedContainer
+		var capabilityContainers []kubernetes.CapabilityContainer
+		var hostNamespaceWorkloads []kubernetes.HostNamespaceWorkload
+		
+		if securityAnalysisFlag || privilegedAnalysisFlag || htmlOutputFlag {
+			privilegedContainers = kubernetes.GetPrivilegedContainers(config)
+		}
+		
+		if securityAnalysisFlag || capabilityAnalysisFlag || htmlOutputFlag {
+			capabilityContainers = kubernetes.GetCapabilityContainers(config)
+		}
+		
+		if securityAnalysisFlag || hostNamespaceAnalysisFlag || htmlOutputFlag {
+			hostNamespaceWorkloads = kubernetes.GetHostNamespaceWorkloads(config)
+		}
+		
+		// Handle HTML output if requested
+		if htmlOutputFlag {
+			htmlFormatter, err := output.NewHTMLFormatter()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error creating HTML formatter: %v\n", err)
+				os.Exit(1)
+			}
+			
+			htmlContent, err := htmlFormatter.GenerateHTML(
+				analyzeClusterName,
+				resourceCounts,
+				privilegedContainers,
+				capabilityContainers,
+				hostNamespaceWorkloads,
+			)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error generating HTML: %v\n", err)
+				os.Exit(1)
+			}
+			
+			// Write to file if output file specified, otherwise stdout
+			if outputFileFlag != "" {
+				// Automatically add .html extension if not present
+				if !strings.HasSuffix(strings.ToLower(outputFileFlag), ".html") {
+					outputFileFlag += ".html"
+				}
+				
+				if err := htmlFormatter.WriteHTMLToFile(htmlContent, outputFileFlag); err != nil {
+					fmt.Fprintf(os.Stderr, "Error writing HTML to file: %v\n", err)
+					os.Exit(1)
+				}
+				fmt.Printf("HTML report saved to: %s\n", outputFileFlag)
+			} else {
+				// Write to stdout
+				fmt.Println(string(htmlContent))
+			}
+			
+			return
+		}
+		
+		// Standard text output (original functionality)
 		fmt.Printf("Analyzing cluster configuration: %s\n\n", analyzeClusterName)
 
 		// Standard resource analysis
-		if !securityAnalysisFlag && !privilegedAnalysisFlag {
+		if !securityAnalysisFlag && !privilegedAnalysisFlag && !capabilityAnalysisFlag && !hostNamespaceAnalysisFlag {
 			showResourceAnalysis(config)
 		}
 
@@ -79,17 +144,17 @@ var analyzeCmd = &cobra.Command{
 
 			// Privileged container analysis
 			if securityAnalysisFlag || privilegedAnalysisFlag {
-				showPrivilegedContainers(config)
+				showPrivilegedContainersText(privilegedContainers)
 			}
 			
 			// Capability analysis
 			if securityAnalysisFlag || capabilityAnalysisFlag {
-				showCapabilityContainers(config)
+				showCapabilityContainersText(capabilityContainers)
 			}
 			
 			// Host namespace analysis
 			if securityAnalysisFlag || hostNamespaceAnalysisFlag {
-				showHostNamespaceWorkloads(config)
+				showHostNamespaceWorkloadsText(hostNamespaceWorkloads)
 			}
 		}
 	},
@@ -121,10 +186,8 @@ func showResourceAnalysis(config *kubernetes.ClusterConfig) {
 	fmt.Println()
 }
 
-// showPrivilegedContainers displays privileged containers in the cluster
-func showPrivilegedContainers(config *kubernetes.ClusterConfig) {
-	privilegedContainers := kubernetes.GetPrivilegedContainers(config)
-	
+// showPrivilegedContainersText displays privileged containers in the cluster (text output)
+func showPrivilegedContainersText(privilegedContainers []kubernetes.PrivilegedContainer) {
 	fmt.Println("Privileged Containers:")
 	fmt.Println("=====================")
 	
@@ -153,9 +216,8 @@ func showPrivilegedContainers(config *kubernetes.ClusterConfig) {
 	fmt.Println()
 }
 
-// showCapabilityContainers displays containers with added Linux capabilities
-func showCapabilityContainers(config *kubernetes.ClusterConfig) {
-	capContainers := kubernetes.GetCapabilityContainers(config)
+// showCapabilityContainersText displays containers with added Linux capabilities (text output)
+func showCapabilityContainersText(capContainers []kubernetes.CapabilityContainer) {
 	
 	fmt.Println("Containers with Added Linux Capabilities:")
 	fmt.Println("=======================================")
@@ -209,9 +271,8 @@ func joinStrings(strs []string, sep string) string {
 	return result
 }
 
-// showHostNamespaceWorkloads displays workloads using host namespaces
-func showHostNamespaceWorkloads(config *kubernetes.ClusterConfig) {
-	workloads := kubernetes.GetHostNamespaceWorkloads(config)
+// showHostNamespaceWorkloadsText displays workloads using host namespaces (text output)
+func showHostNamespaceWorkloadsText(workloads []kubernetes.HostNamespaceWorkload) {
 	
 	fmt.Println("Workloads Using Host Namespaces:")
 	fmt.Println("===============================")
@@ -285,5 +346,7 @@ func init() {
 	analyzeCmd.Flags().BoolVar(&privilegedAnalysisFlag, "privileged", false, "Check for privileged containers in the cluster configuration")
 	analyzeCmd.Flags().BoolVar(&capabilityAnalysisFlag, "capabilities", false, "Check for containers with added Linux capabilities")
 	analyzeCmd.Flags().BoolVar(&hostNamespaceAnalysisFlag, "host-namespaces", false, "Check for workloads using host namespaces")
+	analyzeCmd.Flags().BoolVar(&htmlOutputFlag, "html", false, "Generate HTML output")
+	analyzeCmd.Flags().StringVarP(&outputFileFlag, "output", "o", "", "File to write output to (default is stdout)")
 	analyzeCmd.MarkFlagRequired("name")
 }
