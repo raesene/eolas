@@ -83,17 +83,34 @@ Options:
 #### Analyze a Cluster Configuration
 
 ```
-eolas analyze -n <cluster-name>
+eolas analyze -n <cluster-name> [flags]
 ```
 
 Options:
 - `-n, --name` - Name of the cluster configuration to analyze (required)
 - `-s, --storage-dir` - Directory where configurations are stored (defaults to .eolas in home directory)
 - `--use-home` - Whether to use the home directory for storage (defaults to true)
+- `--security` - Run security-focused analysis on the cluster configuration
+- `--privileged` - Check for privileged containers in the cluster configuration
+- `--capabilities` - Check for containers with added Linux capabilities
+- `--host-namespaces` - Check for workloads using host namespaces
 
-Example:
-```
+Examples:
+```bash
+# Basic resource count analysis
 eolas analyze -n kind-cluster
+
+# Full security analysis (includes all security checks)
+eolas analyze -n kind-cluster --security
+
+# Specific security analysis for privileged containers
+eolas analyze -n kind-cluster --privileged
+
+# Specific security analysis for containers with added capabilities
+eolas analyze -n kind-cluster --capabilities
+
+# Specific security analysis for workloads using host namespaces
+eolas analyze -n kind-cluster --host-namespaces
 ```
 
 ## Development
@@ -144,6 +161,52 @@ make help      # Show help message
 - List stored configurations
 - Analyze cluster configurations for detailed insights
   - Resource type counts and distributions
+  - Security analysis capabilities:
+    - Identification of privileged containers
+    - Detection of containers with added Linux capabilities
+    - Discovery of workloads using host namespaces (hostPID, hostIPC, hostNetwork)
+    - Identification of containers exposing host ports
+
+## Security Analysis
+
+Eolas provides several security analysis features to help identify potential security risks in your Kubernetes cluster configurations. These features can be used individually or together using the `--security` flag.
+
+### Privileged Containers
+
+Privileged containers have full access to the host's kernel capabilities and device nodes, similar to root access on the host. These pose significant security risks and should be carefully reviewed.
+
+```bash
+eolas analyze -n my-cluster --privileged
+```
+
+### Linux Capabilities
+
+Linux capabilities provide fine-grained control over privileged operations. Containers with added capabilities have elevated privileges that may pose security risks. Particularly dangerous capabilities include: CAP_SYS_ADMIN, CAP_NET_ADMIN, CAP_SYS_PTRACE, and CAP_NET_RAW.
+
+```bash
+eolas analyze -n my-cluster --capabilities
+```
+
+### Host Namespaces
+
+Host namespaces provide containers with access to the host's resources, reducing isolation between containers and the host system. Each namespace type has specific security implications:
+
+- **hostPID**: Allows visibility of all processes on the host system
+- **hostIPC**: Enables shared memory access with the host and all containers
+- **hostNetwork**: Provides direct access to the host's network interfaces
+- **hostPorts**: Exposes ports directly on the host's network interfaces
+
+```bash
+eolas analyze -n my-cluster --host-namespaces
+```
+
+### Combined Security Analysis
+
+Run all security checks at once using the `--security` flag:
+
+```bash
+eolas analyze -n my-cluster --security
+```
 
 ## Releases
 
