@@ -21,4 +21,8 @@ eolas
 .eolas/
 
 # Sample data (contains potential sensitive data)
-sample_data/
+sample_data/*.html
+
+# Generated reports
+*.html
+*-report.html
