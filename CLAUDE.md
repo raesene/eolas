@@ -20,6 +20,8 @@ Eolas is a command-line utility for analyzing Kubernetes cluster configurations.
     - `parser.go` - Functions for parsing and analyzing configurations
   - `storage/` - Configuration storage
     - `filestore.go` - File-based storage implementation
+  - `output/` - Output formatting functionality
+    - `html.go` - HTML report generation
 - `.github/` - GitHub-related files
   - `workflows/` - GitHub Actions workflows
     - `release.yml` - Workflow for automated releases
@@ -90,6 +92,9 @@ The project uses specific analysis functions in `pkg/kubernetes`:
 
 - `ParseConfig` - Parses JSON data into Kubernetes structures
 - `GetResourceCounts` - Counts resources by type
+- `GetPrivilegedContainers` - Identifies containers running with privileged security context
+- `GetCapabilityContainers` - Identifies containers with added Linux capabilities
+- `GetHostNamespaceWorkloads` - Identifies workloads using host namespaces
 
 ## Common Operations
 
@@ -169,3 +174,63 @@ When adding new analysis features:
 2. For resource-specific analysis, add functions to `pkg/kubernetes/parser.go`
 3. For UI formatting, follow the existing pattern of aligned columns and clear headers
 4. Update help text and examples to demonstrate the new functionality
+
+## Security Analysis Features
+
+Eolas includes several security-focused analysis features:
+
+### Privileged Containers
+
+- Detection of containers running with privileged security context
+- Implemented in `GetPrivilegedContainers()` in parser.go
+- Available with `--privileged` flag or as part of `--security`
+
+### Linux Capabilities
+
+- Detection of containers with added Linux capabilities
+- Implemented in `GetCapabilityContainers()` in parser.go
+- Available with `--capabilities` flag or as part of `--security`
+- Highlights particularly dangerous capabilities like CAP_SYS_ADMIN
+
+### Host Namespaces
+
+- Detection of workloads using host namespaces (hostPID, hostIPC, hostNetwork)
+- Also detects containers exposing host ports
+- Implemented in `GetHostNamespaceWorkloads()` in parser.go
+- Available with `--host-namespaces` flag or as part of `--security`
+
+### Combined Security Analysis
+
+- The `--security` flag runs all security analysis features
+- Results displayed in formatted sections for each security topic
+- Also works in combination with other output formats
+
+## Output Formats
+
+Eolas currently supports multiple output formats:
+
+### Text Output (Default)
+
+- The default output format is text, displayed to stdout
+- Text output uses aligned columns for tabular data
+- Each analysis section has a clear header and formatting
+
+### HTML Output
+
+- HTML reports are generated with the `--html` flag
+- Output can be saved to a file with the `-o/--output` flag
+- HTML reports are self-contained (CSS and JavaScript embedded)
+- Features:
+  - Responsive design that works on all screen sizes
+  - Tabbed interface for different analysis sections
+  - Color-coded indicators for security issues
+  - Overview dashboard with resource counts
+  
+### Output Formatter Structure
+
+When adding a new output format:
+1. Create a new file in `pkg/output/` for the formatter
+2. Follow the pattern used in `html.go`
+3. Add appropriate flags to the analyze command
+4. Update the analyze command's Run function to handle the new format
+5. Document the new format in the README.md
