@@ -23,4 +23,15 @@ type Metadata struct {
 	Labels            map[string]string `json:"labels,omitempty"`
 	Annotations       map[string]string `json:"annotations,omitempty"`
 	CreationTimestamp string            `json:"creationTimestamp,omitempty"`
+	OwnerReferences   []OwnerReference  `json:"ownerReferences,omitempty"`
+}
+
+// OwnerReference contains the information to identify an owner object
+type OwnerReference struct {
+	APIVersion         string `json:"apiVersion,omitempty"`
+	Kind               string `json:"kind,omitempty"`
+	Name               string `json:"name,omitempty"`
+	UID                string `json:"uid,omitempty"`
+	Controller         bool   `json:"controller,omitempty"`
+	BlockOwnerDeletion bool   `json:"blockOwnerDeletion,omitempty"`
 }
