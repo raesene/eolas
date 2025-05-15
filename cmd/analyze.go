@@ -21,6 +21,7 @@ var (
 	privilegedAnalysisFlag    bool
 	capabilityAnalysisFlag    bool
 	hostNamespaceAnalysisFlag bool
+	hostPathAnalysisFlag      bool
 	htmlOutputFlag            bool
 	outputFileFlag            string
 )
@@ -75,6 +76,7 @@ var analyzeCmd = &cobra.Command{
 		var privilegedContainers []kubernetes.PrivilegedContainer
 		var capabilityContainers []kubernetes.CapabilityContainer
 		var hostNamespaceWorkloads []kubernetes.HostNamespaceWorkload
+		var hostPathVolumes []kubernetes.HostPathVolume
 		
 		if securityAnalysisFlag || privilegedAnalysisFlag || htmlOutputFlag {
 			privilegedContainers = kubernetes.GetPrivilegedContainers(config)
@@ -86,6 +88,10 @@ var analyzeCmd = &cobra.Command{
 		
 		if securityAnalysisFlag || hostNamespaceAnalysisFlag || htmlOutputFlag {
 			hostNamespaceWorkloads = kubernetes.GetHostNamespaceWorkloads(config)
+		}
+		
+		if securityAnalysisFlag || hostPathAnalysisFlag || htmlOutputFlag {
+			hostPathVolumes = kubernetes.GetHostPathVolumes(config)
 		}
 		
 		// Handle HTML output if requested
@@ -102,6 +108,7 @@ var analyzeCmd = &cobra.Command{
 				privilegedContainers,
 				capabilityContainers,
 				hostNamespaceWorkloads,
+				hostPathVolumes,
 			)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error generating HTML: %v\n", err)
@@ -137,7 +144,7 @@ var analyzeCmd = &cobra.Command{
 		}
 
 		// Security analysis
-		if securityAnalysisFlag || privilegedAnalysisFlag || capabilityAnalysisFlag || hostNamespaceAnalysisFlag {
+		if securityAnalysisFlag || privilegedAnalysisFlag || capabilityAnalysisFlag || hostNamespaceAnalysisFlag || hostPathAnalysisFlag {
 			// If any security flag is enabled, show security analysis header
 			fmt.Println("Security Analysis:")
 			fmt.Println("=================")
@@ -155,6 +162,11 @@ var analyzeCmd = &cobra.Command{
 			// Host namespace analysis
 			if securityAnalysisFlag || hostNamespaceAnalysisFlag {
 				showHostNamespaceWorkloadsText(hostNamespaceWorkloads)
+			}
+			
+			// Host path volume analysis
+			if securityAnalysisFlag || hostPathAnalysisFlag {
+				showHostPathVolumesText(hostPathVolumes)
 			}
 		}
 	},
@@ -337,6 +349,64 @@ func showHostNamespaceWorkloadsText(workloads []kubernetes.HostNamespaceWorkload
 	fmt.Println()
 }
 
+// showHostPathVolumesText displays workloads using hostPath volumes (text output)
+func showHostPathVolumesText(volumes []kubernetes.HostPathVolume) {
+	
+	fmt.Println("Workloads Using Host Path Volumes:")
+	fmt.Println("=================================")
+	
+	if len(volumes) == 0 {
+		fmt.Println("No workloads using hostPath volumes found in the cluster.")
+		fmt.Println()
+		return
+	}
+	
+	fmt.Printf("Found %d workloads using hostPath volumes\n\n", len(volumes))
+	
+	// Print table header
+	fmt.Printf("%-20s %-15s %-20s %-15s %s\n", 
+		"NAMESPACE", "RESOURCE TYPE", "NAME", "READ-ONLY", "HOST PATH")
+	fmt.Printf("%-20s %-15s %-20s %-15s %s\n", 
+		"---------", "------------", "----", "---------", "---------")
+	
+	// Print each workload with their host paths
+	for _, v := range volumes {
+		namespace := v.Namespace
+		if namespace == "" {
+			namespace = "default"
+		}
+		
+		// Print a row for each hostPath in the workload
+		for i, path := range v.HostPaths {
+			readOnly := "No"
+			if i < len(v.ReadOnly) && v.ReadOnly[i] {
+				readOnly = "Yes"
+			}
+			
+			// For the first path, include the workload details
+			if i == 0 {
+				fmt.Printf("%-20s %-15s %-20s %-15s %s\n", 
+					namespace, v.Kind, v.Name, readOnly, path)
+			} else {
+				// For subsequent paths, just include the path and read-only status
+				fmt.Printf("%-20s %-15s %-20s %-15s %s\n", 
+					"", "", "", readOnly, path)
+			}
+		}
+	}
+	
+	fmt.Println()
+	fmt.Println("Note: hostPath volumes allow pods to mount files or directories from the host node's")
+	fmt.Println("filesystem directly into the pod. This poses significant security risks as it enables")
+	fmt.Println("containers to access and potentially modify sensitive areas of the host filesystem.")
+	fmt.Println("Risks include:")
+	fmt.Println("- Read access to sensitive host files")
+	fmt.Println("- Potential modification of host system files (when not read-only)")
+	fmt.Println("- Persistence across pod restarts, potentially allowing data exfiltration")
+	fmt.Println("- Potential for privilege escalation through the host filesystem")
+	fmt.Println()
+}
+
 func init() {
 	rootCmd.AddCommand(analyzeCmd)
 	analyzeCmd.Flags().StringVarP(&analyzeClusterName, "name", "n", "", "Name of the cluster configuration to analyze (required)")
@@ -346,6 +416,7 @@ func init() {
 	analyzeCmd.Flags().BoolVar(&privilegedAnalysisFlag, "privileged", false, "Check for privileged containers in the cluster configuration")
 	analyzeCmd.Flags().BoolVar(&capabilityAnalysisFlag, "capabilities", false, "Check for containers with added Linux capabilities")
 	analyzeCmd.Flags().BoolVar(&hostNamespaceAnalysisFlag, "host-namespaces", false, "Check for workloads using host namespaces")
+	analyzeCmd.Flags().BoolVar(&hostPathAnalysisFlag, "host-path", false, "Check for workloads using hostPath volumes")
 	analyzeCmd.Flags().BoolVar(&htmlOutputFlag, "html", false, "Generate HTML output")
 	analyzeCmd.Flags().StringVarP(&outputFileFlag, "output", "o", "", "File to write output to (default is stdout)")
 	analyzeCmd.MarkFlagRequired("name")

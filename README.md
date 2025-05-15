@@ -94,6 +94,7 @@ Options:
 - `--privileged` - Check for privileged containers in the cluster configuration
 - `--capabilities` - Check for containers with added Linux capabilities
 - `--host-namespaces` - Check for workloads using host namespaces
+- `--host-path` - Check for workloads using hostPath volumes
 - `--html` - Generate HTML output
 - `-o, --output` - File to write output to (default is stdout)
 
@@ -113,6 +114,9 @@ eolas analyze -n kind-cluster --capabilities
 
 # Specific security analysis for workloads using host namespaces
 eolas analyze -n kind-cluster --host-namespaces
+
+# Specific security analysis for workloads using hostPath volumes
+eolas analyze -n kind-cluster --host-path
 
 # Generate an HTML report and save to file
 eolas analyze -n kind-cluster --html -o cluster-report.html
@@ -174,6 +178,7 @@ make help      # Show help message
     - Detection of containers with added Linux capabilities
     - Discovery of workloads using host namespaces (hostPID, hostIPC, hostNetwork)
     - Identification of containers exposing host ports
+    - Detection of workloads using hostPath volumes
 
 ## Security Analysis
 
@@ -206,6 +211,19 @@ Host namespaces provide containers with access to the host's resources, reducing
 
 ```bash
 eolas analyze -n my-cluster --host-namespaces
+```
+
+### Host Path Volumes
+
+hostPath volumes allow pods to mount files or directories from the host node's filesystem directly into the pod. This poses significant security risks as it enables containers to access and potentially modify sensitive areas of the host filesystem. Risks include:
+
+- Read access to sensitive host files
+- Potential modification of host system files (when not mounted read-only)
+- Persistence across pod restarts, potentially allowing data exfiltration
+- Potential for privilege escalation through the host filesystem
+
+```bash
+eolas analyze -n my-cluster --host-path
 ```
 
 ### Combined Security Analysis

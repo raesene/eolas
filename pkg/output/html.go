@@ -25,6 +25,7 @@ type HTMLData struct {
 	PrivilegedResults []kubernetes.PrivilegedContainer
 	CapabilityResults []kubernetes.CapabilityContainer
 	HostNSResults     []kubernetes.HostNamespaceWorkload
+	HostPathResults   []kubernetes.HostPathVolume
 }
 
 // NewHTMLFormatter creates a new HTML formatter with the embedded template
@@ -46,6 +47,7 @@ func (f *HTMLFormatter) GenerateHTML(
 	privilegedResults []kubernetes.PrivilegedContainer,
 	capabilityResults []kubernetes.CapabilityContainer,
 	hostNSResults []kubernetes.HostNamespaceWorkload,
+	hostPathResults []kubernetes.HostPathVolume,
 ) ([]byte, error) {
 	// Calculate total resources
 	totalResources := 0
@@ -63,6 +65,7 @@ func (f *HTMLFormatter) GenerateHTML(
 		PrivilegedResults: privilegedResults,
 		CapabilityResults: capabilityResults,
 		HostNSResults:     hostNSResults,
+		HostPathResults:   hostPathResults,
 	}
 
 	var buf bytes.Buffer
@@ -326,6 +329,7 @@ const htmlTemplate = `<!DOCTYPE html>
             <div class="tab" onclick="showTab('privileged')">Privileged Containers</div>
             <div class="tab" onclick="showTab('capabilities')">Linux Capabilities</div>
             <div class="tab" onclick="showTab('host-namespaces')">Host Namespaces</div>
+            <div class="tab" onclick="showTab('host-paths')">Host Path Volumes</div>
         </div>
 
         <!-- Overview Tab Content -->
@@ -483,6 +487,75 @@ const htmlTemplate = `<!DOCTYPE html>
             </div>
             {{ else }}
             <p>No workloads using host namespaces found in the cluster. 👍</p>
+            {{ end }}
+        </div>
+
+        <!-- Host Path Volumes Tab Content -->
+        <div id="host-paths" class="tab-content">
+            <h2>Workloads Using Host Path Volumes</h2>
+            
+            {{ if .HostPathResults }}
+            <div class="alert alert-danger">
+                <p><strong>Warning:</strong> Found {{ len .HostPathResults }} workloads using hostPath volumes.</p>
+                <p>hostPath volumes allow pods to access the host filesystem directly, potentially exposing sensitive files or enabling privilege escalation.</p>
+            </div>
+            
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Namespace</th>
+                        <th>Resource Type</th>
+                        <th>Name</th>
+                        <th>Host Path</th>
+                        <th>Read-Only</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .HostPathResults }}
+                        {{ $namespace := .Namespace }}
+                        {{ $kind := .Kind }}
+                        {{ $name := .Name }}
+                        {{ $volume := . }}
+                        {{ range $i, $path := .HostPaths }}
+                            <tr>
+                                {{ if eq $i 0 }}
+                                <td>{{ if eq $namespace "" }}default{{ else }}{{ $namespace }}{{ end }}</td>
+                                <td>{{ $kind }}</td>
+                                <td>{{ $name }}</td>
+                                {{ else }}
+                                <td></td>
+                                <td></td>
+                                <td></td>
+                                {{ end }}
+                                <td>{{ $path }}</td>
+                                <td>
+                                    {{ if and (ge $i 0) (lt $i (len $volume.ReadOnly)) }}
+                                        {{ if index $volume.ReadOnly $i }}Yes{{ else }}No{{ end }}
+                                    {{ else }}
+                                        Unknown
+                                    {{ end }}
+                                </td>
+                            </tr>
+                        {{ end }}
+                    {{ end }}
+                </tbody>
+            </table>
+            
+            <div class="note">
+                <h3>Security Implications</h3>
+                <p>hostPath volumes pose significant security risks as they enable containers to access the host filesystem directly:</p>
+                <ul>
+                    <li><strong>Host System Access:</strong> Containers can read sensitive files from the host</li>
+                    <li><strong>Data Persistence:</strong> Data can persist across pod restarts and be accessed by other pods</li>
+                    <li><strong>Privilege Escalation:</strong> Write access to the host filesystem can enable privilege escalation</li>
+                    <li><strong>Host Modification:</strong> Non read-only mounts allow containers to modify host files</li>
+                </ul>
+                <p>For improved security, consider using more restrictive volume types like emptyDir, configMap, or persistent volumes with appropriate access controls.</p>
+            </div>
+            {{ else }}
+            <div class="alert alert-success">
+                <p><strong>Good news!</strong> No workloads using hostPath volumes were found in the cluster.</p>
+            </div>
             {{ end }}
         </div>
 

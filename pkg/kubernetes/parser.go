@@ -56,6 +56,15 @@ type HostNamespaceWorkload struct {
 	ContainerNames  []string
 }
 
+// HostPathVolume represents a workload with hostPath volumes
+type HostPathVolume struct {
+	Name            string
+	Namespace       string
+	Kind            string
+	HostPaths       []string
+	ReadOnly        []bool
+}
+
 // GetPrivilegedContainers identifies containers running with privileged security context
 func GetPrivilegedContainers(config *ClusterConfig) []PrivilegedContainer {
 	var results []PrivilegedContainer
@@ -725,5 +734,226 @@ func containsInt(slice []int, item int) bool {
 			return true
 		}
 	}
+	return false
+}
+
+// GetHostPathVolumes identifies workloads with hostPath volumes
+func GetHostPathVolumes(config *ClusterConfig) []HostPathVolume {
+	var results []HostPathVolume
+	var podResults []HostPathVolume
+	var controllerResults []HostPathVolume
+	
+	// Create a map to track the pods we've already associated with controllers
+	processedPods := make(map[string]bool)
+	
+	// First pass: collect all controller resources
+	for _, item := range config.Items {
+		if item.Kind == "Deployment" || item.Kind == "StatefulSet" || 
+		   item.Kind == "DaemonSet" || item.Kind == "ReplicaSet" || 
+		   item.Kind == "Job" || item.Kind == "CronJob" {
+			// Resources that create pods
+			checkWorkloadForHostPathVolumes(item, &controllerResults)
+			
+			// Mark pods managed by this controller as processed
+			key := fmt.Sprintf("%s/%s", item.Kind, item.Metadata.Name)
+			markManagedPods(config, key, processedPods)
+		}
+	}
+	
+	// Second pass: collect all pods not already processed
+	for _, item := range config.Items {
+		if item.Kind == "Pod" {
+			// Only process if we haven't seen this pod associated with a controller
+			podKey := fmt.Sprintf("%s/%s", item.Metadata.Namespace, item.Metadata.Name)
+			if !processedPods[podKey] {
+				checkPodForHostPathVolumes(item, item.Metadata.Name, item.Metadata.Namespace, item.Kind, &podResults)
+			}
+		}
+	}
+	
+	// Combine results
+	results = append(results, controllerResults...)
+	results = append(results, podResults...)
+	
+	// Deduplicate results
+	return deduplicateHostPathWorkloads(results)
+}
+
+// deduplicateHostPathWorkloads removes duplicate entries that refer to the same workload
+func deduplicateHostPathWorkloads(results []HostPathVolume) []HostPathVolume {
+	// Map to track unique workloads based on namespace + name
+	seen := make(map[string]bool)
+	var uniqueResults []HostPathVolume
+	
+	// First, add all controller resources (non-Pod) to the result list
+	for _, result := range results {
+		// For controller resources (Deployment, DaemonSet, etc.)
+		if result.Kind != "Pod" {
+			key := fmt.Sprintf("%s/%s/%s", result.Namespace, result.Kind, result.Name)
+			if !seen[key] {
+				seen[key] = true
+				uniqueResults = append(uniqueResults, result)
+			}
+		}
+	}
+	
+	// Then, add pods that are not controlled by any resources we've already added
+	for _, result := range results {
+		if result.Kind == "Pod" {
+			// We always want to include these control-plane pods
+			isControlPlanePod := false
+			controlPlanePods := []string{
+				"etcd-", "kube-apiserver-", "kube-controller-manager-", "kube-scheduler-",
+			}
+			
+			for _, prefix := range controlPlanePods {
+				if strings.HasPrefix(result.Name, prefix) {
+					isControlPlanePod = true
+					break
+				}
+			}
+			
+			key := fmt.Sprintf("%s/%s/%s", result.Namespace, result.Kind, result.Name)
+			if isControlPlanePod && !seen[key] {
+				seen[key] = true
+				uniqueResults = append(uniqueResults, result)
+			}
+		}
+	}
+	
+	return uniqueResults
+}
+
+// checkPodForHostPathVolumes examines a pod for hostPath volume usage
+func checkPodForHostPathVolumes(item Item, name, namespace, kind string, results *[]HostPathVolume) {
+	if spec, ok := item.Spec.(map[string]interface{}); ok {
+		// Check if volumes are defined
+		volumes, ok := spec["volumes"].([]interface{})
+		if !ok || len(volumes) == 0 {
+			return // No volumes defined
+		}
+		
+		var hostPaths []string
+		var readOnly []bool
+		
+		// Check each volume for hostPath type
+		for _, v := range volumes {
+			volume, ok := v.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			
+			// Look for hostPath volume type
+			hostPath, ok := volume["hostPath"].(map[string]interface{})
+			if !ok {
+				continue // Not a hostPath volume
+			}
+			
+			// Get the path from the hostPath
+			path, ok := hostPath["path"].(string)
+			if !ok || path == "" {
+				continue // No path defined
+			}
+			
+			// Get the volume name to check if it's mounted read-only
+			volumeName, _ := volume["name"].(string)
+			
+			// Check if this volume is mounted read-only in any container
+			isReadOnly := false
+			
+			// Check regular containers
+			if containers, ok := spec["containers"].([]interface{}); ok {
+				isReadOnly = checkContainersForReadOnlyMount(containers, volumeName)
+			}
+			
+			// Check init containers
+			if initContainers, ok := spec["initContainers"].([]interface{}); ok {
+				if readOnly := checkContainersForReadOnlyMount(initContainers, volumeName); readOnly {
+					isReadOnly = true
+				}
+			}
+			
+			hostPaths = append(hostPaths, path)
+			readOnly = append(readOnly, isReadOnly)
+		}
+		
+		// Only add to results if hostPath volumes were found
+		if len(hostPaths) > 0 {
+			*results = append(*results, HostPathVolume{
+				Name:      name,
+				Namespace: namespace,
+				Kind:      kind,
+				HostPaths: hostPaths,
+				ReadOnly:  readOnly,
+			})
+		}
+	}
+}
+
+// checkWorkloadForHostPathVolumes examines workload resources for hostPath volumes
+func checkWorkloadForHostPathVolumes(item Item, results *[]HostPathVolume) {
+	workloadName := item.Metadata.Name
+	namespace := item.Metadata.Namespace
+	kind := item.Kind
+	
+	// Navigate to pod spec based on resource type
+	if spec, ok := item.Spec.(map[string]interface{}); ok {
+		// For CronJob, need to go through jobTemplate
+		if kind == "CronJob" {
+			if jobTemplate, ok := spec["jobTemplate"].(map[string]interface{}); ok {
+				if jobSpec, ok := jobTemplate["spec"].(map[string]interface{}); ok {
+					spec = jobSpec // Update spec to job spec
+				}
+			}
+		}
+		
+		// Get template for all workload types
+		if template, ok := spec["template"].(map[string]interface{}); ok {
+			if podSpec, ok := template["spec"].(map[string]interface{}); ok {
+				// Create a mock Pod item to reuse the pod checking logic
+				mockPod := Item{
+					Kind: kind,
+					Metadata: Metadata{
+						Name:      workloadName,
+						Namespace: namespace,
+					},
+					Spec: podSpec,
+				}
+				
+				checkPodForHostPathVolumes(mockPod, workloadName, namespace, kind, results)
+			}
+		}
+	}
+}
+
+// checkContainersForReadOnlyMount checks if a volume is mounted read-only in any container
+func checkContainersForReadOnlyMount(containers []interface{}, volumeName string) bool {
+	for _, c := range containers {
+		container, ok := c.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		
+		volumeMounts, ok := container["volumeMounts"].([]interface{})
+		if !ok {
+			continue
+		}
+		
+		for _, vm := range volumeMounts {
+			mount, ok := vm.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			
+			name, _ := mount["name"].(string)
+			if name == volumeName {
+				readOnly, ok := mount["readOnly"].(bool)
+				if ok && readOnly {
+					return true
+				}
+			}
+		}
+	}
+	
 	return false
 }

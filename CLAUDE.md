@@ -95,6 +95,7 @@ The project uses specific analysis functions in `pkg/kubernetes`:
 - `GetPrivilegedContainers` - Identifies containers running with privileged security context
 - `GetCapabilityContainers` - Identifies containers with added Linux capabilities
 - `GetHostNamespaceWorkloads` - Identifies workloads using host namespaces
+- `GetHostPathVolumes` - Identifies workloads using hostPath volumes
 
 ## Common Operations
 
@@ -198,6 +199,14 @@ Eolas includes several security-focused analysis features:
 - Also detects containers exposing host ports
 - Implemented in `GetHostNamespaceWorkloads()` in parser.go
 - Available with `--host-namespaces` flag or as part of `--security`
+
+### Host Path Volumes
+
+- Detection of workloads using hostPath volumes to mount host filesystem paths
+- Identifies the specific paths mounted and whether they're mounted read-only
+- Implemented in `GetHostPathVolumes()` in parser.go
+- Available with `--host-path` flag or as part of `--security`
+- Identifies security risks from containers accessing the host filesystem
 
 ### Combined Security Analysis
 
