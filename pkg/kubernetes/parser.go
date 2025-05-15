@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // ParseConfig parses Kubernetes configuration JSON data
@@ -58,21 +59,106 @@ type HostNamespaceWorkload struct {
 // GetPrivilegedContainers identifies containers running with privileged security context
 func GetPrivilegedContainers(config *ClusterConfig) []PrivilegedContainer {
 	var results []PrivilegedContainer
+	var podResults []PrivilegedContainer
+	var controllerResults []PrivilegedContainer
 	
-	// Process all items in the cluster configuration
+	// First pass: collect all controller resources
 	for _, item := range config.Items {
-		// Look for pod-related resources (Pod, Deployment, StatefulSet, DaemonSet, etc.)
-		switch item.Kind {
-		case "Pod":
-			// Direct Pod resources
-			processPrivilegedContainersInPod(item, item.Metadata.Name, item.Metadata.Namespace, item.Kind, &results)
-		case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob":
+		if item.Kind == "Deployment" || item.Kind == "StatefulSet" || 
+		   item.Kind == "DaemonSet" || item.Kind == "ReplicaSet" || 
+		   item.Kind == "Job" || item.Kind == "CronJob" {
 			// Resources that create pods
-			processPrivilegedContainersInWorkload(item, &results)
+			processPrivilegedContainersInWorkload(item, &controllerResults)
 		}
 	}
 	
-	return results
+	// Second pass: collect all standalone pods (not managed by controllers)
+	for _, item := range config.Items {
+		if item.Kind == "Pod" {
+			// Check if this pod is managed by a controller we've already processed
+			managed := false
+			for _, ref := range item.Metadata.OwnerReferences {
+				if ref.Kind == "Deployment" || ref.Kind == "StatefulSet" || 
+				   ref.Kind == "DaemonSet" || ref.Kind == "ReplicaSet" || 
+				   ref.Kind == "Job" || ref.Kind == "CronJob" {
+					managed = true
+					break
+				}
+			}
+			
+			// Only process unmanaged pods
+			if !managed {
+				processPrivilegedContainersInPod(item, item.Metadata.Name, item.Metadata.Namespace, item.Kind, &podResults)
+			}
+		}
+	}
+	
+	// Combine results
+	results = append(results, controllerResults...)
+	results = append(results, podResults...)
+	
+	// Deduplicate results (in case the same owner has multiple containers)
+	return deduplicatePrivilegedResults(results)
+}
+
+// deduplicatePrivilegedResults removes duplicate entries that refer to the same resource
+// It prioritizes higher level resources like Deployments over their child resources
+func deduplicatePrivilegedResults(results []PrivilegedContainer) []PrivilegedContainer {
+	// Map container name to a slice of results for that container
+	containerMap := make(map[string][]PrivilegedContainer)
+	
+	// Group results by container name
+	for _, result := range results {
+		key := fmt.Sprintf("%s|%s", result.Namespace, result.Name)
+		containerMap[key] = append(containerMap[key], result)
+	}
+	
+	// For each container, prioritize higher-level resources
+	var deduplicated []PrivilegedContainer
+	for _, resources := range containerMap {
+		// Find highest priority resource (Deployment > ReplicaSet > Pod)
+		highestPriority := findHighestPriorityResource(resources)
+		deduplicated = append(deduplicated, highestPriority)
+	}
+	
+	return deduplicated
+}
+
+// findHighestPriorityResource selects the highest priority resource from a slice of resources
+// Priority: Deployment > StatefulSet > DaemonSet > Job > CronJob > ReplicaSet > Pod
+func findHighestPriorityResource(resources []PrivilegedContainer) PrivilegedContainer {
+	if len(resources) == 0 {
+		// This should never happen, but handle it gracefully
+		return PrivilegedContainer{}
+	}
+	
+	if len(resources) == 1 {
+		return resources[0]
+	}
+	
+	// Define priority order (higher number = higher priority)
+	kindPriority := map[string]int{
+		"Pod":         1,
+		"ReplicaSet":  2,
+		"Job":         3,
+		"CronJob":     4,
+		"DaemonSet":   5,
+		"StatefulSet": 6,
+		"Deployment":  7,
+	}
+	
+	highest := resources[0]
+	highestPriority := kindPriority[highest.Kind]
+	
+	for _, res := range resources[1:] {
+		priority := kindPriority[res.Kind]
+		if priority > highestPriority {
+			highest = res
+			highestPriority = priority
+		}
+	}
+	
+	return highest
 }
 
 // processPrivilegedContainersInPod checks if pod spec contains privileged containers
@@ -152,21 +238,106 @@ func checkContainersForPrivileged(containers []interface{}, ownerName, namespace
 // GetCapabilityContainers identifies containers with added Linux capabilities
 func GetCapabilityContainers(config *ClusterConfig) []CapabilityContainer {
 	var results []CapabilityContainer
+	var podResults []CapabilityContainer
+	var controllerResults []CapabilityContainer
 	
-	// Process all items in the cluster configuration
+	// First pass: collect all controller resources
 	for _, item := range config.Items {
-		// Look for pod-related resources (Pod, Deployment, StatefulSet, DaemonSet, etc.)
-		switch item.Kind {
-		case "Pod":
-			// Direct Pod resources
-			processCapabilityContainersInPod(item, item.Metadata.Name, item.Metadata.Namespace, item.Kind, &results)
-		case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob":
+		if item.Kind == "Deployment" || item.Kind == "StatefulSet" || 
+		   item.Kind == "DaemonSet" || item.Kind == "ReplicaSet" || 
+		   item.Kind == "Job" || item.Kind == "CronJob" {
 			// Resources that create pods
-			processCapabilityContainersInWorkload(item, &results)
+			processCapabilityContainersInWorkload(item, &controllerResults)
 		}
 	}
 	
-	return results
+	// Second pass: collect all standalone pods (not managed by controllers)
+	for _, item := range config.Items {
+		if item.Kind == "Pod" {
+			// Check if this pod is managed by a controller we've already processed
+			managed := false
+			for _, ref := range item.Metadata.OwnerReferences {
+				if ref.Kind == "Deployment" || ref.Kind == "StatefulSet" || 
+				   ref.Kind == "DaemonSet" || ref.Kind == "ReplicaSet" || 
+				   ref.Kind == "Job" || ref.Kind == "CronJob" {
+					managed = true
+					break
+				}
+			}
+			
+			// Only process unmanaged pods
+			if !managed {
+				processCapabilityContainersInPod(item, item.Metadata.Name, item.Metadata.Namespace, item.Kind, &podResults)
+			}
+		}
+	}
+	
+	// Combine results
+	results = append(results, controllerResults...)
+	results = append(results, podResults...)
+	
+	// Deduplicate results
+	return deduplicateCapabilityResults(results)
+}
+
+// deduplicateCapabilityResults removes duplicate entries that refer to the same resource
+// It prioritizes higher level resources like Deployments over their child resources
+func deduplicateCapabilityResults(results []CapabilityContainer) []CapabilityContainer {
+	// Map container name to a slice of results for that container
+	containerMap := make(map[string][]CapabilityContainer)
+	
+	// Group results by container name
+	for _, result := range results {
+		key := fmt.Sprintf("%s|%s", result.Namespace, result.Name)
+		containerMap[key] = append(containerMap[key], result)
+	}
+	
+	// For each container, prioritize higher-level resources
+	var deduplicated []CapabilityContainer
+	for _, resources := range containerMap {
+		// Find highest priority resource (Deployment > ReplicaSet > Pod)
+		highestPriority := findHighestPriorityCapabilityResource(resources)
+		deduplicated = append(deduplicated, highestPriority)
+	}
+	
+	return deduplicated
+}
+
+// findHighestPriorityCapabilityResource selects the highest priority resource from a slice of resources
+// Priority: Deployment > StatefulSet > DaemonSet > Job > CronJob > ReplicaSet > Pod
+func findHighestPriorityCapabilityResource(resources []CapabilityContainer) CapabilityContainer {
+	if len(resources) == 0 {
+		// This should never happen, but handle it gracefully
+		return CapabilityContainer{}
+	}
+	
+	if len(resources) == 1 {
+		return resources[0]
+	}
+	
+	// Define priority order (higher number = higher priority)
+	kindPriority := map[string]int{
+		"Pod":         1,
+		"ReplicaSet":  2,
+		"Job":         3,
+		"CronJob":     4,
+		"DaemonSet":   5,
+		"StatefulSet": 6,
+		"Deployment":  7,
+	}
+	
+	highest := resources[0]
+	highestPriority := kindPriority[highest.Kind]
+	
+	for _, res := range resources[1:] {
+		priority := kindPriority[res.Kind]
+		if priority > highestPriority {
+			highest = res
+			highestPriority = priority
+		}
+	}
+	
+	return highest
 }
 
 // processCapabilityContainersInPod checks if pod spec contains containers with added capabilities
@@ -261,21 +432,164 @@ func checkContainersForCapabilities(containers []interface{}, ownerName, namespa
 // GetHostNamespaceWorkloads identifies workloads using host namespaces
 func GetHostNamespaceWorkloads(config *ClusterConfig) []HostNamespaceWorkload {
 	var results []HostNamespaceWorkload
+	var podResults []HostNamespaceWorkload
+	var controllerResults []HostNamespaceWorkload
 	
-	// Process all items in the cluster configuration
+	// Create a map to track the pods we've already associated with controllers
+	processedPods := make(map[string]bool)
+	
+	// First pass: collect all controller resources
 	for _, item := range config.Items {
-		// Look for pod-related resources
-		switch item.Kind {
-		case "Pod":
-			// Direct Pod resources
-			checkPodForHostNamespaces(item, item.Metadata.Name, item.Metadata.Namespace, item.Kind, &results)
-		case "Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Job", "CronJob":
+		if item.Kind == "Deployment" || item.Kind == "StatefulSet" || 
+		   item.Kind == "DaemonSet" || item.Kind == "ReplicaSet" || 
+		   item.Kind == "Job" || item.Kind == "CronJob" {
 			// Resources that create pods
-			checkWorkloadForHostNamespaces(item, &results)
+			checkWorkloadForHostNamespaces(item, &controllerResults)
+			
+			// Mark pods managed by this controller as processed
+			key := fmt.Sprintf("%s/%s", item.Kind, item.Metadata.Name)
+			markManagedPods(config, key, processedPods)
 		}
 	}
 	
-	return results
+	// Second pass: collect all pods not already processed
+	for _, item := range config.Items {
+		if item.Kind == "Pod" {
+			// Only process if we haven't seen this pod associated with a controller
+			podKey := fmt.Sprintf("%s/%s", item.Metadata.Namespace, item.Metadata.Name)
+			if !processedPods[podKey] {
+				checkPodForHostNamespaces(item, item.Metadata.Name, item.Metadata.Namespace, item.Kind, &podResults)
+			}
+		}
+	}
+	
+	// Combine results
+	results = append(results, controllerResults...)
+	results = append(results, podResults...)
+	
+	// Deduplicate results
+	return deduplicateHostNamespaceWorkloads(results)
+}
+
+// markManagedPods marks all pods managed by a specific controller
+func markManagedPods(config *ClusterConfig, controllerKey string, processedPods map[string]bool) {
+	for _, item := range config.Items {
+		if item.Kind == "Pod" {
+			for _, ref := range item.Metadata.OwnerReferences {
+				refKey := fmt.Sprintf("%s/%s", ref.Kind, ref.Name)
+				if refKey == controllerKey {
+					podKey := fmt.Sprintf("%s/%s", item.Metadata.Namespace, item.Metadata.Name)
+					processedPods[podKey] = true
+					break
+				}
+			}
+		}
+	}
+}
+
+// deduplicateHostNamespaceWorkloads removes duplicate entries that refer to the same workload
+func deduplicateHostNamespaceWorkloads(results []HostNamespaceWorkload) []HostNamespaceWorkload {
+	// Map to track unique workloads based on namespace + name
+	seen := make(map[string]bool)
+	var uniqueResults []HostNamespaceWorkload
+	
+	// First, add all controller resources (non-Pod) to the result list
+	for _, result := range results {
+		// For controller resources (Deployment, DaemonSet, etc.)
+		if result.Kind != "Pod" {
+			key := fmt.Sprintf("%s/%s/%s", result.Namespace, result.Kind, result.Name)
+			if !seen[key] {
+				seen[key] = true
+				uniqueResults = append(uniqueResults, result)
+			}
+		}
+	}
+	
+	// Then, add pods that are not controlled by any resources we've already added
+	for _, result := range results {
+		if result.Kind == "Pod" {
+			// We always want to include these control-plane pods
+			isControlPlanePod := false
+			controlPlanePods := []string{
+				"etcd-", "kube-apiserver-", "kube-controller-manager-", "kube-scheduler-",
+			}
+			
+			for _, prefix := range controlPlanePods {
+				if strings.HasPrefix(result.Name, prefix) {
+					isControlPlanePod = true
+					break
+				}
+			}
+			
+			key := fmt.Sprintf("%s/%s/%s", result.Namespace, result.Kind, result.Name)
+			if isControlPlanePod && !seen[key] {
+				seen[key] = true
+				uniqueResults = append(uniqueResults, result)
+			}
+		}
+	}
+	
+	return uniqueResults
+}
+
+// deduplicateHostNamespaceResults removes duplicate entries that refer to the same resource
+// It prioritizes higher level resources like Deployments over their child resources
+func deduplicateHostNamespaceResults(results []HostNamespaceWorkload) []HostNamespaceWorkload {
+	// Map workload name to a slice of results for that workload
+	workloadMap := make(map[string][]HostNamespaceWorkload)
+	
+	// Group results by workload name
+	for _, result := range results {
+		key := fmt.Sprintf("%s|%s", result.Namespace, result.Name)
+		workloadMap[key] = append(workloadMap[key], result)
+	}
+	
+	// For each workload, prioritize higher-level resources
+	var deduplicated []HostNamespaceWorkload
+	for _, resources := range workloadMap {
+		// Find highest priority resource (Deployment > ReplicaSet > Pod)
+		highestPriority := findHighestPriorityHostNamespaceResource(resources)
+		deduplicated = append(deduplicated, highestPriority)
+	}
+	
+	return deduplicated
+}
+
+// findHighestPriorityHostNamespaceResource selects the highest priority resource from a slice of resources
+// Priority: Deployment > StatefulSet > DaemonSet > Job > CronJob > ReplicaSet > Pod
+func findHighestPriorityHostNamespaceResource(resources []HostNamespaceWorkload) HostNamespaceWorkload {
+	if len(resources) == 0 {
+		// This should never happen, but handle it gracefully
+		return HostNamespaceWorkload{}
+	}
+	
+	if len(resources) == 1 {
+		return resources[0]
+	}
+	
+	// Define priority order (higher number = higher priority)
+	kindPriority := map[string]int{
+		"Pod":         1,
+		"ReplicaSet":  2,
+		"Job":         3,
+		"CronJob":     4,
+		"DaemonSet":   5,
+		"StatefulSet": 6,
+		"Deployment":  7,
+	}
+	
+	highest := resources[0]
+	highestPriority := kindPriority[highest.Kind]
+	
+	for _, res := range resources[1:] {
+		priority := kindPriority[res.Kind]
+		if priority > highestPriority {
+			highest = res
+			highestPriority = priority
+		}
+	}
+	
+	return highest
 }
 
 // checkPodForHostNamespaces examines a pod for host namespace usage
