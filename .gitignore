@@ -27,3 +27,5 @@ sample_data/*.json
 # Generated reports
 *.html
 *-report.html
+.DS_Store
+docs/.DS_Store
