@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eolas - Kubernetes Cluster Analyzer</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Add a favicon using the logo -->
+    <link rel="icon" type="image/png" href="images/logo.png">
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <div class="logo">
+                <img src="images/logo.png" alt="Eolas Logo" height="50">
+                <h1>Eolas</h1>
+            </div>
+            <nav>
+                <ul class="nav-links">
+                    <li><a href="#overview">Overview</a></li>
+                    <li><a href="#installation">Installation</a></li>
+                    <li><a href="#usage">Usage</a></li>
+                    <li><a href="#security-analysis">Security Analysis</a></li>
+                    <li><a href="#output-formats">Output Formats</a></li>
+                    <li><a href="#development">Development</a></li>
+                    <li><a href="https://github.com/raesene/eolas" target="_blank">GitHub</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-content">
+                <h2>Kubernetes Cluster Configuration Analyzer</h2>
+                <p>Eolas is a command-line utility for analyzing Kubernetes cluster configurations. It ingests JSON files containing Kubernetes resources, stores them, and provides powerful analysis capabilities.</p>
+                <div class="cta-buttons">
+                    <a href="#installation" class="btn primary">Get Started</a>
+                    <a href="https://github.com/raesene/eolas" class="btn secondary" target="_blank">View on GitHub</a>
+                </div>
+            </div>
+        </section>
+
+        <section id="overview" class="content-section">
+            <h2>Overview</h2>
+            <p>Eolas helps security professionals and cluster administrators analyze their Kubernetes configurations to identify security risks and understand resource usage. The name "Eolas" means "knowledge" in Irish, reflecting the tool's purpose of providing insights into your cluster.</p>
+            
+            <div class="features">
+                <div class="feature-card">
+                    <h3>Resource Analysis</h3>
+                    <p>Count and categorize all Kubernetes resources in your cluster.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Security Scanning</h3>
+                    <p>Identify security risks like privileged containers and dangerous Linux capabilities.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Host Access Detection</h3>
+                    <p>Find workloads with access to host namespaces and filesystems.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>HTML Reports</h3>
+                    <p>Generate detailed HTML reports for easy sharing and review.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="installation" class="content-section">
+            <h2>Installation</h2>
+            
+            <h3>Download Pre-built Binaries</h3>
+            <p>Pre-built binaries for Linux, macOS, and Windows are available on the <a href="https://github.com/raesene/eolas/releases" target="_blank">GitHub Releases page</a>.</p>
+            <ol>
+                <li>Navigate to the <a href="https://github.com/raesene/eolas/releases" target="_blank">Releases page</a></li>
+                <li>Download the appropriate binary for your platform:
+                    <ul>
+                        <li><code>eolas_Linux_x86_64.tar.gz</code> for Linux (64-bit)</li>
+                        <li><code>eolas_Darwin_x86_64.tar.gz</code> for macOS (Intel)</li>
+                        <li><code>eolas_Darwin_arm64.tar.gz</code> for macOS (Apple Silicon)</li>
+                        <li><code>eolas_Windows_x86_64.zip</code> for Windows (64-bit)</li>
+                    </ul>
+                </li>
+                <li>Extract the binary and place it in your PATH</li>
+            </ol>
+
+            <h3>Install from Source</h3>
+            <p>If you prefer to install from source:</p>
+            <div class="code-block">
+                <pre><code>go install github.com/raesene/eolas@latest</code></pre>
+            </div>
+        </section>
+
+        <section id="usage" class="content-section">
+            <h2>Usage</h2>
+            
+            <h3>Generating Kubernetes Configuration JSON</h3>
+            <p>To generate the JSON configuration file for ingestion into Eolas, use the following <code>kubectl</code> command:</p>
+            <div class="code-block">
+                <pre><code>kubectl get $(kubectl api-resources --verbs=list -o name | grep -v -e "secrets" -e "componentstatuses" \
+       -e "priorityclass" -e "events" | paste -sd, -) --ignore-not-found --all-namespaces -o json > cluster-config.json</code></pre>
+            </div>
+
+            <h3>Ingesting Configurations</h3>
+            <p>After generating the JSON file, you can ingest it into Eolas:</p>
+            <div class="code-block">
+                <pre><code>eolas ingest -f cluster-config.json -n my-cluster</code></pre>
+            </div>
+            
+            <h3>Listing Stored Configurations</h3>
+            <div class="code-block">
+                <pre><code>eolas list</code></pre>
+            </div>
+            
+            <h3>Basic Analysis</h3>
+            <p>To perform basic resource count analysis:</p>
+            <div class="code-block">
+                <pre><code>eolas analyze -n my-cluster</code></pre>
+            </div>
+        </section>
+
+        <section id="security-analysis" class="content-section">
+            <h2>Security Analysis</h2>
+            <p>Eolas provides several security analysis features to help identify potential security risks in your Kubernetes cluster configurations.</p>
+            
+            <h3>Privileged Containers</h3>
+            <p>Privileged containers have full access to the host's kernel capabilities and device nodes, similar to root access on the host.</p>
+            <div class="code-block">
+                <pre><code>eolas analyze -n my-cluster --privileged</code></pre>
+            </div>
+            
+            <h3>Linux Capabilities</h3>
+            <p>Linux capabilities provide fine-grained control over privileged operations. Containers with added capabilities have elevated privileges that may pose security risks.</p>
+            <div class="code-block">
+                <pre><code>eolas analyze -n my-cluster --capabilities</code></pre>
+            </div>
+            
+            <h3>Host Namespaces</h3>
+            <p>Host namespaces provide containers with access to the host's resources, reducing isolation between containers and the host system.</p>
+            <div class="code-block">
+                <pre><code>eolas analyze -n my-cluster --host-namespaces</code></pre>
+            </div>
+            
+            <h3>Host Path Volumes</h3>
+            <p>hostPath volumes allow pods to mount files or directories from the host node's filesystem directly into the pod.</p>
+            <div class="code-block">
+                <pre><code>eolas analyze -n my-cluster --host-path</code></pre>
+            </div>
+            
+            <h3>Combined Security Analysis</h3>
+            <p>Run all security checks at once:</p>
+            <div class="code-block">
+                <pre><code>eolas analyze -n my-cluster --security</code></pre>
+            </div>
+        </section>
+
+        <section id="output-formats" class="content-section">
+            <h2>Output Formats</h2>
+            
+            <h3>Text Output (Default)</h3>
+            <p>By default, Eolas displays results as formatted text to the console.</p>
+            
+            <h3>HTML Reports</h3>
+            <p>Generate interactive HTML reports with all analysis results:</p>
+            <div class="code-block">
+                <pre><code>eolas analyze -n my-cluster --security --html -o security-report.html</code></pre>
+            </div>
+            <p>HTML reports include:</p>
+            <ul>
+                <li>Overview dashboard with resource counts and security findings</li>
+                <li>Tabbed interface for easy navigation between different analysis types</li>
+                <li>Color-coded tables for better visualization of security issues</li>
+                <li>Responsive design that works on all devices</li>
+            </ul>
+            
+            <div class="sample-report">
+                <h4>Sample HTML Report</h4>
+                <figure>
+                    <img src="images/sample-report.png" alt="Sample HTML report generated by Eolas" class="report-image">
+                    <figcaption>A sample HTML report showing security analysis results for a Kubernetes cluster</figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <section id="development" class="content-section">
+            <h2>Development</h2>
+            
+            <h3>Project Structure</h3>
+            <ul>
+                <li><code>cmd/</code> - Command implementations using Cobra</li>
+                <li><code>pkg/kubernetes/</code> - Kubernetes configuration parsing</li>
+                <li><code>pkg/storage/</code> - Configuration storage</li>
+                <li><code>pkg/output/</code> - Output formatting</li>
+            </ul>
+            
+            <h3>Building from Source</h3>
+            <div class="code-block">
+                <pre><code># Clone the repository
+git clone https://github.com/raesene/eolas.git
+cd eolas
+
+# Build
+go build
+# or use the included Makefile
+make build
+
+# Run
+./eolas</code></pre>
+            </div>
+            
+            <h3>Using Make</h3>
+            <p>The project includes a Makefile with common operations:</p>
+            <div class="code-block">
+                <pre><code>make build     # Build the application
+make clean     # Remove build artifacts
+make test      # Run tests
+make fmt       # Format code
+make vet       # Run go vet
+make install   # Install the application
+make check     # Run all quality checks
+make run       # Build and run the application</code></pre>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="https://github.com/raesene/eolas" target="_blank">GitHub</a>
+                <a href="https://github.com/raesene/eolas/issues" target="_blank">Issues</a>
+                <a href="https://github.com/raesene/eolas/releases" target="_blank">Releases</a>
+            </div>
+            <p>&copy; 2025 Eolas Project Contributors</p>
+        </div>
+    </footer>
+
+    <script src="js/script.js"></script>
+</body>
+</html>
