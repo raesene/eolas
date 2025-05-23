@@ -20,6 +20,8 @@
                     <li><a href="#overview">Overview</a></li>
                     <li><a href="#installation">Installation</a></li>
                     <li><a href="#usage">Usage</a></li>
+                    <li><a href="#storage-backends">Storage</a></li>
+                    <li><a href="#comparison">Comparison</a></li>
                     <li><a href="#security-analysis">Security Analysis</a></li>
                     <li><a href="#output-formats">Output Formats</a></li>
                     <li><a href="#development">Development</a></li>
@@ -45,22 +47,40 @@
             <h2>Overview</h2>
             <p>Eolas helps security professionals and cluster administrators analyze their Kubernetes configurations to identify security risks and understand resource usage. The name "Eolas" means "knowledge" in Scots Gaelic, reflecting the tool's purpose of providing insights into your cluster.</p>
             
+            <p>With dual storage backends and configuration versioning, Eolas now enables tracking cluster evolution over time, comparing configurations, and generating timeline reports to understand how your security posture changes.</p>
+            
             <div class="features">
                 <div class="feature-card">
-                    <h3>Resource Analysis</h3>
+                    <h3>📊 Resource Analysis</h3>
                     <p>Count and categorize all Kubernetes resources in your cluster.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>Security Scanning</h3>
+                    <h3>🔒 Security Scanning</h3>
                     <p>Identify security risks like privileged containers and dangerous Linux capabilities.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>Host Access Detection</h3>
+                    <h3>🖥️ Host Access Detection</h3>
                     <p>Find workloads with access to host namespaces and filesystems.</p>
                 </div>
                 <div class="feature-card">
-                    <h3>HTML Reports</h3>
+                    <h3>📄 HTML Reports</h3>
                     <p>Generate detailed HTML reports for easy sharing and review.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>💾 Dual Storage Backends</h3>
+                    <p>Choose between file-based storage or SQLite for advanced features.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>📈 Configuration Evolution</h3>
+                    <p>Track changes over time with versioning and timeline reports.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🔄 Configuration Comparison</h3>
+                    <p>Compare configurations side-by-side to identify differences.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>🚀 Data Management</h3>
+                    <p>Export, migrate, and maintain your configuration data.</p>
                 </div>
             </div>
         </section>
@@ -118,6 +138,121 @@
             </div>
         </section>
 
+        <section id="storage-backends" class="content-section">
+            <h2>Storage Backends</h2>
+            <p>Eolas supports two storage backends, each with different capabilities:</p>
+            
+            <h3>File Backend (Default)</h3>
+            <p>The traditional file-based storage stores configurations as individual JSON files.</p>
+            <div class="code-block">
+                <pre><code># Uses file backend by default
+eolas ingest -f cluster-config.json -n my-cluster
+
+# Explicitly specify file backend
+eolas ingest -f cluster-config.json -n my-cluster --backend file</code></pre>
+            </div>
+            
+            <h3>SQLite Backend</h3>
+            <p>The SQLite backend enables advanced features like versioning, comparison, and timeline reports:</p>
+            <div class="code-block">
+                <pre><code># Use SQLite backend for advanced features
+eolas ingest -f cluster-config.json -n my-cluster --backend sqlite
+
+# All commands support backend selection
+eolas list --backend sqlite
+eolas analyze -n my-cluster --backend sqlite --security</code></pre>
+            </div>
+            
+            <h4>SQLite-Exclusive Features</h4>
+            <ul>
+                <li><strong>Configuration Versioning</strong> - Multiple versions of the same configuration</li>
+                <li><strong>Timeline Reports</strong> - Visual evolution of configurations over time</li>
+                <li><strong>Enhanced Comparison</strong> - Detailed side-by-side configuration analysis</li>
+                <li><strong>Security Analysis History</strong> - Track security findings over time</li>
+                <li><strong>Performance Optimization</strong> - Pre-computed security analysis for faster queries</li>
+            </ul>
+            
+            <h3>Storage Directory</h3>
+            <p>Both backends support custom storage locations:</p>
+            <div class="code-block">
+                <pre><code># Use custom storage directory
+eolas ingest -f cluster-config.json -n my-cluster -s /path/to/storage
+
+# Use home directory (.eolas in user's home)
+eolas ingest -f cluster-config.json -n my-cluster --home</code></pre>
+            </div>
+        </section>
+
+        <section id="comparison" class="content-section">
+            <h2>Configuration Comparison & Evolution</h2>
+            
+            <h3>Comparing Configurations</h3>
+            <p>Compare two configurations to identify differences in resources and security findings:</p>
+            <div class="code-block">
+                <pre><code># Compare two stored configurations
+eolas compare config1 config2
+
+# Compare with HTML output
+eolas compare config1 config2 --html -o comparison-report.html
+
+# Compare using SQLite backend for enhanced details
+eolas compare config1 config2 --backend sqlite</code></pre>
+            </div>
+            
+            <h3>Configuration History</h3>
+            <p>With SQLite backend, view the evolution of a configuration:</p>
+            <div class="code-block">
+                <pre><code># List all versions of a configuration
+eolas list --backend sqlite --history my-cluster
+
+# Analyze a specific version by ID
+eolas analyze --backend sqlite --id abc123def456</code></pre>
+            </div>
+            
+            <h3>Timeline Reports</h3>
+            <p>Generate visual timeline reports showing configuration evolution (SQLite only):</p>
+            <div class="code-block">
+                <pre><code># Generate timeline report for a configuration
+eolas timeline my-cluster --backend sqlite --html -o timeline.html
+
+# Include trend analysis
+eolas timeline my-cluster --backend sqlite --trends --html -o timeline-trends.html</code></pre>
+            </div>
+            
+            <h3>Data Management</h3>
+            <p>Export, migrate, and maintain your configuration data:</p>
+            
+            <h4>Export Data</h4>
+            <div class="code-block">
+                <pre><code># Export all configurations to JSON
+eolas export --backend sqlite --format json -o export.json
+
+# Export security analysis to CSV
+eolas export --backend sqlite --type security --format csv -o security.csv
+
+# Export specific configuration resources
+eolas export my-cluster --type resources --format json</code></pre>
+            </div>
+            
+            <h4>Migrate Between Backends</h4>
+            <div class="code-block">
+                <pre><code># Migrate from file to SQLite backend
+eolas migrate --from file --to sqlite
+
+# Dry run to preview migration
+eolas migrate --from file --to sqlite --dry-run</code></pre>
+            </div>
+            
+            <h4>Cleanup Old Data</h4>
+            <div class="code-block">
+                <pre><code># Remove configurations older than 30 days
+eolas cleanup --backend sqlite --older-than 30d
+
+# Remove all versions except the latest 5 for each configuration
+eolas cleanup --backend sqlite --keep-latest 5</code></pre>
+            </div>
+        </section>
+
         <section id="security-analysis" class="content-section">
             <h2>Security Analysis</h2>
             <p>Eolas provides several security analysis features to help identify potential security risks in your Kubernetes cluster configurations.</p>
@@ -172,6 +307,43 @@
                 <li>Responsive design that works on all devices</li>
             </ul>
             
+            <h3>Timeline HTML Reports</h3>
+            <p>With SQLite backend, generate visual timeline reports showing configuration evolution:</p>
+            <div class="code-block">
+                <pre><code>eolas timeline my-cluster --backend sqlite --html -o timeline.html</code></pre>
+            </div>
+            <p>Timeline reports feature:</p>
+            <ul>
+                <li>Interactive timeline visualization of configuration changes</li>
+                <li>Resource count trends over time</li>
+                <li>Security analysis evolution tracking</li>
+                <li>Trend detection for improving or degrading security posture</li>
+                <li>Professional dashboard with embedded charts and graphs</li>
+            </ul>
+            
+            <h3>Comparison HTML Reports</h3>
+            <p>Generate side-by-side comparison reports:</p>
+            <div class="code-block">
+                <pre><code>eolas compare config1 config2 --html -o comparison.html</code></pre>
+            </div>
+            <p>Comparison reports show:</p>
+            <ul>
+                <li>Side-by-side resource count differences</li>
+                <li>Security finding comparisons with highlighting</li>
+                <li>Added, removed, and modified resources</li>
+                <li>Clear visual indicators for changes</li>
+            </ul>
+            
+            <h3>Data Export Formats</h3>
+            <p>Export configuration data in multiple formats:</p>
+            <div class="code-block">
+                <pre><code># Export to JSON format
+eolas export --backend sqlite --format json -o data.json
+
+# Export to CSV format
+eolas export --backend sqlite --format csv -o data.csv</code></pre>
+            </div>
+            
             <div class="sample-report">
                 <h4>Sample HTML Report</h4>
                 <figure>
@@ -186,10 +358,33 @@
             
             <h3>Project Structure</h3>
             <ul>
-                <li><code>cmd/</code> - Command implementations using Cobra</li>
+                <li><code>cmd/</code> - Command implementations using Cobra
+                    <ul>
+                        <li><code>analyze.go</code> - Configuration analysis</li>
+                        <li><code>compare.go</code> - Configuration comparison</li>
+                        <li><code>timeline.go</code> - Timeline reports</li>
+                        <li><code>ingest.go</code> - Configuration ingestion</li>
+                        <li><code>list.go</code> - Configuration listing</li>
+                        <li><code>migrate.go</code> - Data migration between backends</li>
+                        <li><code>export.go</code> - Data export functionality</li>
+                        <li><code>cleanup.go</code> - Data maintenance and cleanup</li>
+                    </ul>
+                </li>
                 <li><code>pkg/kubernetes/</code> - Kubernetes configuration parsing</li>
-                <li><code>pkg/storage/</code> - Configuration storage</li>
-                <li><code>pkg/output/</code> - Output formatting</li>
+                <li><code>pkg/storage/</code> - Dual storage backend system
+                    <ul>
+                        <li><code>interface.go</code> - Storage interface definition</li>
+                        <li><code>filestore.go</code> - File-based storage backend</li>
+                        <li><code>sqlitestore.go</code> - SQLite storage backend</li>
+                    </ul>
+                </li>
+                <li><code>pkg/output/</code> - Output formatting
+                    <ul>
+                        <li><code>html.go</code> - Standard HTML report generation</li>
+                        <li><code>timeline.go</code> - Timeline HTML reports</li>
+                        <li><code>comparison.go</code> - Comparison HTML reports</li>
+                    </ul>
+                </li>
             </ul>
             
             <h3>Building from Source</h3>
