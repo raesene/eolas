@@ -253,6 +253,13 @@ func (fs *FileStore) CompareConfigs(id1, id2 string) (*ConfigComparison, error) 
 	}, nil
 }
 
+// GetSecurityAnalysisHistory returns security analysis history (limited for file storage)
+func (fs *FileStore) GetSecurityAnalysisHistory(name string) ([]StoredSecurityAnalysis, error) {
+	// File storage doesn't maintain security analysis history
+	// Return empty slice to maintain interface compatibility
+	return []StoredSecurityAnalysis{}, nil
+}
+
 // Close is a no-op for file storage
 func (fs *FileStore) Close() error {
 	return nil

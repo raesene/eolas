@@ -21,6 +21,9 @@ type Store interface {
 	// Comparison operations
 	CompareConfigs(id1, id2 string) (*ConfigComparison, error)
 	
+	// Security analysis operations
+	GetSecurityAnalysisHistory(name string) ([]StoredSecurityAnalysis, error)
+	
 	// Storage management
 	Close() error
 }

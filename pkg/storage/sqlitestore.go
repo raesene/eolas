@@ -473,6 +473,55 @@ func (s *SQLiteStore) DeleteConfig(id string) error {
 	return tx.Commit()
 }
 
+// GetSecurityAnalysisHistory retrieves security analysis for all configurations with a given name
+func (s *SQLiteStore) GetSecurityAnalysisHistory(name string) ([]StoredSecurityAnalysis, error) {
+	rows, err := s.db.Query(`
+		SELECT sa.config_id, sa.privileged_containers, sa.capability_containers, 
+			   sa.host_namespace_workloads, sa.host_path_volumes
+		FROM security_analysis sa
+		JOIN configs c ON sa.config_id = c.id
+		WHERE c.name = ?
+		ORDER BY c.timestamp ASC
+	`, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query security analysis history: %w", err)
+	}
+	defer rows.Close()
+
+	var history []StoredSecurityAnalysis
+	for rows.Next() {
+		var analysis StoredSecurityAnalysis
+		var privilegedJSON, capabilityJSON, hostNamespaceJSON, hostPathJSON string
+
+		err := rows.Scan(&analysis.ConfigID, &privilegedJSON, &capabilityJSON, 
+			&hostNamespaceJSON, &hostPathJSON)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan security analysis: %w", err)
+		}
+
+		// Deserialize JSON fields
+		if err := json.Unmarshal([]byte(privilegedJSON), &analysis.PrivilegedContainers); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal privileged containers: %w", err)
+		}
+
+		if err := json.Unmarshal([]byte(capabilityJSON), &analysis.CapabilityContainers); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal capability containers: %w", err)
+		}
+
+		if err := json.Unmarshal([]byte(hostNamespaceJSON), &analysis.HostNamespaceWorkloads); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal host namespace workloads: %w", err)
+		}
+
+		if err := json.Unmarshal([]byte(hostPathJSON), &analysis.HostPathVolumes); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal host path volumes: %w", err)
+		}
+
+		history = append(history, analysis)
+	}
+
+	return history, rows.Err()
+}
+
 // Close closes the database connection
 func (s *SQLiteStore) Close() error {
 	if s.db != nil {
