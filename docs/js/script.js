@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Highlight active section in navigation
     function highlightActiveSection() {
         const sections = document.querySelectorAll('.content-section');
-        const navLinks = document.querySelectorAll('.nav-links a');
+        const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
         
         let currentSectionId = '';
         const scrollPosition = window.scrollY;

@@ -17,6 +17,7 @@ var (
 	analyzeClusterName        string
 	analyzeStorageDir         string
 	analyzeUseHomeDir         bool
+	analyzeStorageBackend     string
 	securityAnalysisFlag      bool
 	privilegedAnalysisFlag    bool
 	capabilityAnalysisFlag    bool
@@ -37,6 +38,12 @@ var analyzeCmd = &cobra.Command{
 			return
 		}
 
+		// Validate storage backend
+		if err := storage.ValidateBackend(analyzeStorageBackend); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
 		// Determine storage directory
 		var storeDir string
 		if analyzeStorageDir != "" {
@@ -55,12 +62,19 @@ var analyzeCmd = &cobra.Command{
 			storeDir = ".eolas"
 		}
 
-		// Create storage handler
-		store, err := storage.NewFileStore(storeDir)
+		// Create storage backend
+		storageConfig := storage.StorageConfig{
+			Backend:    storage.Backend(analyzeStorageBackend),
+			StorageDir: storeDir,
+			UseHomeDir: analyzeUseHomeDir,
+		}
+
+		store, err := storage.NewStore(storageConfig)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error accessing storage: %v\n", err)
 			os.Exit(1)
 		}
+		defer store.Close()
 
 		// Load configuration
 		config, err := store.LoadConfig(analyzeClusterName)
@@ -412,6 +426,7 @@ func init() {
 	analyzeCmd.Flags().StringVarP(&analyzeClusterName, "name", "n", "", "Name of the cluster configuration to analyze (required)")
 	analyzeCmd.Flags().StringVarP(&analyzeStorageDir, "storage-dir", "s", "", "Directory where configurations are stored (defaults to .eolas in home directory)")
 	analyzeCmd.Flags().BoolVarP(&analyzeUseHomeDir, "use-home", "", true, "Use .eolas directory in user's home directory")
+	analyzeCmd.Flags().StringVar(&analyzeStorageBackend, "backend", "file", "Storage backend to use (file, sqlite)")
 	analyzeCmd.Flags().BoolVar(&securityAnalysisFlag, "security", false, "Run security-focused analysis on the cluster configuration")
 	analyzeCmd.Flags().BoolVar(&privilegedAnalysisFlag, "privileged", false, "Check for privileged containers in the cluster configuration")
 	analyzeCmd.Flags().BoolVar(&capabilityAnalysisFlag, "capabilities", false, "Check for containers with added Linux capabilities")

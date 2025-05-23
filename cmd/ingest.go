@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	inputFile    string
-	clusterName  string
-	storageDir   string
-	useHomeDir   bool
+	inputFile      string
+	clusterName    string
+	storageDir     string
+	useHomeDir     bool
+	storageBackend string
 )
 
 var ingestCmd = &cobra.Command{
@@ -27,6 +28,12 @@ var ingestCmd = &cobra.Command{
 			fmt.Println("Error: input file is required")
 			cmd.Help()
 			return
+		}
+
+		// Validate storage backend
+		if err := storage.ValidateBackend(storageBackend); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
 		}
 
 		// Check if file exists
@@ -84,18 +91,25 @@ var ingestCmd = &cobra.Command{
 			storeDir = ".eolas"
 		}
 
-		// Store configuration
-		store, err := storage.NewFileStore(storeDir)
+		// Create storage backend
+		storageConfig := storage.StorageConfig{
+			Backend:    storage.Backend(storageBackend),
+			StorageDir: storeDir,
+			UseHomeDir: useHomeDir,
+		}
+
+		store, err := storage.NewStore(storageConfig)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating file store: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error creating storage backend: %v\n", err)
 			os.Exit(1)
 		}
+		defer store.Close()
 
 		if err := store.SaveConfig(config, clusterName); err != nil {
 			fmt.Fprintf(os.Stderr, "Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Configuration saved as '%s' in %s\n", clusterName, storeDir)
+		fmt.Printf("Configuration saved as '%s' using %s backend in %s\n", clusterName, storageBackend, storeDir)
 	},
 }
 
@@ -121,5 +135,6 @@ func init() {
 	ingestCmd.Flags().StringVarP(&clusterName, "name", "n", "", "Name to identify the cluster configuration (defaults to timestamp)")
 	ingestCmd.Flags().StringVarP(&storageDir, "storage-dir", "s", "", "Directory to store parsed configurations (defaults to .eolas in home directory)")
 	ingestCmd.Flags().BoolVarP(&useHomeDir, "use-home", "", true, "Store configurations in .eolas directory in user's home directory")
+	ingestCmd.Flags().StringVar(&storageBackend, "backend", "file", "Storage backend to use (file, sqlite)")
 	ingestCmd.MarkFlagRequired("file")
 }

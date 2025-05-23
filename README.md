@@ -1,10 +1,24 @@
 # Eolas
 
-Eolas is a command line utility for analyzing Kubernetes cluster configurations. It ingests JSON files containing Kubernetes resources and provides analysis capabilities.
+Eolas is a comprehensive command-line utility for analyzing Kubernetes cluster configurations with advanced storage, comparison, and reporting capabilities. It ingests JSON files containing Kubernetes resources and provides powerful analysis, versioning, and temporal tracking features.
 
-## Installation
+## ✨ Key Features
 
-### Download Pre-built Binaries
+- **📊 Comprehensive Analysis**: Resource counts, security analysis, and configuration insights
+- **🗄️ Dual Storage Backends**: File-based and SQLite storage with versioning
+- **📈 Configuration Evolution**: Timeline reports and trend analysis
+- **⚖️ Configuration Comparison**: Compare configurations across time and environments
+- **🔒 Security Focus**: Privileged containers, capabilities, host access detection
+- **📱 Interactive Reports**: Responsive HTML reports with embedded CSS
+- **📤 Data Export**: JSON and CSV export for external processing
+- **🔄 Data Migration**: Seamless migration between storage backends
+- **🧹 Maintenance Tools**: Cleanup and optimization utilities
+
+## 🚀 Quick Start
+
+### Installation
+
+#### Download Pre-built Binaries
 
 Pre-built binaries for Linux, macOS, and Windows are available on the [GitHub Releases page](https://github.com/raesene/eolas/releases).
 
@@ -16,261 +30,307 @@ Pre-built binaries for Linux, macOS, and Windows are available on the [GitHub Re
    - `eolas_Windows_x86_64.zip` for Windows (64-bit)
 3. Extract the binary and place it in your PATH
 
-### Install from Source
+#### Install from Source
 
-If you prefer to install from source:
-
-```
+```bash
 go install github.com/raesene/eolas@latest
 ```
 
-## Generating Kubernetes Configuration JSON
+### Generate Kubernetes Configuration
 
-To generate the JSON configuration file for ingestion into Eolas, use the following `kubectl` command:
+Extract your cluster configuration using kubectl:
 
 ```bash
 kubectl get $(kubectl api-resources --verbs=list -o name | grep -v -e "secrets" -e "componentstatuses" -e "priorityclass" -e "events" | paste -sd, -) --ignore-not-found --all-namespaces -o json > cluster-config.json
 ```
 
-This command:
-
-1. Gets a list of all available API resources that support the `list` verb
-2. Excludes sensitive or high-volume resources (secrets, componentstatuses, priorityclass, events)
-3. Retrieves all instances of these resources across all namespaces
-4. Outputs the result as a single JSON file
-
-After generating the JSON file, you can ingest it into Eolas:
+### Basic Usage
 
 ```bash
-eolas ingest -f cluster-config.json -n my-cluster
+# Ingest a configuration
+eolas ingest -f cluster-config.json -n prod-cluster
+
+# Analyze the configuration
+eolas analyze -n prod-cluster --security
+
+# Generate HTML report
+eolas analyze -n prod-cluster --security --html -o report.html
 ```
 
-## Usage
+## 📋 Commands Overview
 
-```
-eolas [command]
-```
+| Command | Description |
+|---------|-------------|
+| `ingest` | Ingest Kubernetes configuration JSON files |
+| `analyze` | Analyze stored configurations with security insights |
+| `list` | List stored configurations and view history |
+| `compare` | Compare two configurations to identify differences |
+| `timeline` | Generate timeline reports showing configuration evolution |
+| `export` | Export analysis data in JSON or CSV format |
+| `migrate` | Migrate data between storage backends |
+| `cleanup` | Clean up old configurations and optimize storage |
+| `version` | Show version and build information |
 
-### Available Commands
+## 🗄️ Storage Backends
 
-#### Ingest Kubernetes Configuration
+Eolas supports two storage backends:
 
-```
-eolas ingest -f <path-to-json-file> -n <cluster-name>
-```
+### File Backend (Default)
+- Simple file-based storage
+- One configuration per file
+- Suitable for basic analysis needs
 
-Options:
-- `-f, --file` - Path to the JSON file containing Kubernetes cluster configuration (required)
-- `-n, --name` - Name to identify the cluster configuration (defaults to timestamp)
-- `-s, --storage-dir` - Directory to store parsed configurations (defaults to .eolas in home directory)
-- `--use-home` - Whether to use the home directory for storage (defaults to true)
+### SQLite Backend (Advanced)
+- Versioned configuration storage
+- Configuration history tracking
+- Timeline and comparison features
+- Pre-computed security analysis
 
-Example:
-```
-eolas ingest -f sample_data/sample-kind.json -n kind-cluster
-```
-
-#### List Stored Configurations
-
-```
-eolas list
-```
-
-Options:
-- `-s, --storage-dir` - Directory where configurations are stored (defaults to .eolas in home directory)
-- `--use-home` - Whether to use the home directory for storage (defaults to true)
-
-#### Analyze a Cluster Configuration
-
-```
-eolas analyze -n <cluster-name> [flags]
-```
-
-Options:
-- `-n, --name` - Name of the cluster configuration to analyze (required)
-- `-s, --storage-dir` - Directory where configurations are stored (defaults to .eolas in home directory)
-- `--use-home` - Whether to use the home directory for storage (defaults to true)
-- `--security` - Run security-focused analysis on the cluster configuration
-- `--privileged` - Check for privileged containers in the cluster configuration
-- `--capabilities` - Check for containers with added Linux capabilities
-- `--host-namespaces` - Check for workloads using host namespaces
-- `--host-path` - Check for workloads using hostPath volumes
-- `--html` - Generate HTML output
-- `-o, --output` - File to write output to (default is stdout)
-
-Examples:
 ```bash
-# Basic resource count analysis
-eolas analyze -n kind-cluster
-
-# Full security analysis (includes all security checks)
-eolas analyze -n kind-cluster --security
-
-# Specific security analysis for privileged containers
-eolas analyze -n kind-cluster --privileged
-
-# Specific security analysis for containers with added capabilities
-eolas analyze -n kind-cluster --capabilities
-
-# Specific security analysis for workloads using host namespaces
-eolas analyze -n kind-cluster --host-namespaces
-
-# Specific security analysis for workloads using hostPath volumes
-eolas analyze -n kind-cluster --host-path
-
-# Generate an HTML report and save to file
-eolas analyze -n kind-cluster --html -o cluster-report.html
-
-# Generate a comprehensive HTML security report
-eolas analyze -n kind-cluster --security --html -o security-report.html
+# Use SQLite backend for advanced features
+eolas ingest -f config.json -n prod-cluster --backend sqlite
+eolas analyze -n prod-cluster --backend sqlite --security
 ```
 
-## Development
+## 📊 Analysis Features
 
+### Resource Analysis
+- Resource type counts and distributions
+- Cluster inventory and resource utilization
+- Namespace-based resource breakdown
+
+### Security Analysis
+Comprehensive security analysis including:
+
+#### 🔴 Privileged Containers
+Identifies containers running with privileged security context:
+```bash
+eolas analyze -n cluster --privileged
 ```
-# Clone the repository
+
+#### 🟡 Linux Capabilities
+Detects containers with added Linux capabilities:
+```bash
+eolas analyze -n cluster --capabilities
+```
+
+#### 🟠 Host Namespace Usage
+Finds workloads using host namespaces (hostPID, hostIPC, hostNetwork):
+```bash
+eolas analyze -n cluster --host-namespaces
+```
+
+#### 🔶 Host Path Volumes
+Identifies workloads mounting host filesystem paths:
+```bash
+eolas analyze -n cluster --host-path
+```
+
+#### 🔒 Combined Security Analysis
+Run all security checks at once:
+```bash
+eolas analyze -n cluster --security
+```
+
+## 📈 Configuration Evolution & Comparison
+
+### Configuration History
+View configuration versions over time (SQLite backend):
+```bash
+eolas list --backend sqlite --history --name prod-cluster
+```
+
+### Configuration Comparison
+Compare two configurations to identify changes:
+```bash
+eolas compare --backend sqlite --config1 uuid1 --config2 uuid2
+eolas compare --backend sqlite --config1 uuid1 --config2 uuid2 --html -o comparison.html
+```
+
+### Timeline Reports
+Generate interactive timeline reports showing configuration evolution:
+```bash
+eolas timeline --name prod-cluster
+eolas timeline --name prod-cluster -o timeline-report.html
+```
+
+Timeline reports include:
+- Configuration version timeline with change tracking
+- Resource trend analysis (increasing/decreasing/stable)
+- Security posture evolution
+- Current vs previous snapshot comparison
+
+## 📤 Data Export
+
+Export analysis data for external processing:
+
+### JSON Export
+```bash
+# Export complete analysis
+eolas export --name cluster --format json
+
+# Export only security findings
+eolas export --name cluster --format json --type security
+
+# Export to custom file
+eolas export --name cluster --format json -o analysis.json
+```
+
+### CSV Export
+```bash
+# Export resource counts
+eolas export --name cluster --format csv --type resources
+
+# Export security findings
+eolas export --name cluster --format csv --type security
+```
+
+## 🔄 Data Migration
+
+Migrate configurations between storage backends:
+
+```bash
+# Preview migration (dry run)
+eolas migrate --from file --to sqlite --dry-run
+
+# Migrate from file to SQLite for advanced features
+eolas migrate --from file --to sqlite
+
+# Force overwrite existing configurations
+eolas migrate --from file --to sqlite --force
+```
+
+## 🧹 Maintenance & Cleanup
+
+### Clean Up Old Configurations
+```bash
+# Remove configurations older than 30 days
+eolas cleanup --older-than 30d --dry-run
+
+# Keep only latest 5 versions (SQLite)
+eolas cleanup --backend sqlite --keep-versions 5
+
+# Clean specific configuration
+eolas cleanup --name old-cluster --older-than 7d
+```
+
+### Storage Optimization
+```bash
+# Dry run to see what would be cleaned
+eolas cleanup --backend sqlite --keep-versions 3 --dry-run
+
+# Actual cleanup
+eolas cleanup --backend sqlite --keep-versions 3
+```
+
+## 📱 HTML Reports
+
+Eolas generates professional, responsive HTML reports with:
+
+- **📊 Overview Dashboard**: Resource counts and security summary
+- **🔍 Tabbed Interface**: Easy navigation between analysis types
+- **🎨 Color-coded Results**: Visual indicators for security issues
+- **📱 Responsive Design**: Works on desktop, tablet, and mobile
+- **📦 Self-contained**: No external dependencies
+
+### Report Types
+
+#### Analysis Reports
+```bash
+eolas analyze -n cluster --security --html -o security-report.html
+```
+
+#### Comparison Reports
+```bash
+eolas compare --config1 id1 --config2 id2 --html -o comparison.html
+```
+
+#### Timeline Reports
+```bash
+eolas timeline --name cluster -o evolution-report.html
+```
+
+## 🔧 Advanced Configuration
+
+### Storage Directory Configuration
+```bash
+# Use custom storage directory
+eolas ingest -f config.json -n cluster -s /path/to/storage
+
+# Use current directory instead of home
+eolas ingest -f config.json -n cluster --use-home=false
+```
+
+### Output Customization
+```bash
+# Output to stdout
+eolas export --name cluster --format json -o -
+
+# Custom filename with automatic extension
+eolas timeline --name cluster -o my-timeline  # Creates my-timeline.html
+```
+
+## 🛠️ Development
+
+### Build from Source
+```bash
 git clone https://github.com/raesene/eolas.git
 cd eolas
-
-# Build
 go build
-# or use make
-make build
-
-# Run
-./eolas
-# or use make
-make run
 ```
 
 ### Using Make
-
-The project includes a Makefile with common operations:
-
-```
+```bash
 make build     # Build the application
-make clean     # Remove build artifacts
 make test      # Run tests
 make fmt       # Format code
 make vet       # Run go vet
-make install   # Install the application
-make check     # Run all quality checks
-make run       # Build and run the application
+make clean     # Remove build artifacts
 make help      # Show help message
 ```
 
-## Project Structure
-
-- `cmd/` - Command implementations
-- `pkg/kubernetes/` - Kubernetes configuration parsing
-- `pkg/storage/` - Configuration storage
-
-## Features
-
-- Parse Kubernetes cluster configuration from JSON files
-- Display resource counts by kind
-- Store configurations for later analysis
-- List stored configurations
-- Analyze cluster configurations for detailed insights
-  - Resource type counts and distributions
-  - Security analysis capabilities:
-    - Identification of privileged containers
-    - Detection of containers with added Linux capabilities
-    - Discovery of workloads using host namespaces (hostPID, hostIPC, hostNetwork)
-    - Identification of containers exposing host ports
-    - Detection of workloads using hostPath volumes
-
-## Security Analysis
-
-Eolas provides several security analysis features to help identify potential security risks in your Kubernetes cluster configurations. These features can be used individually or together using the `--security` flag.
-
-### Privileged Containers
-
-Privileged containers have full access to the host's kernel capabilities and device nodes, similar to root access on the host. These pose significant security risks and should be carefully reviewed.
-
-```bash
-eolas analyze -n my-cluster --privileged
+### Project Structure
+```
+eolas/
+├── cmd/           # Command implementations (analyze, ingest, compare, etc.)
+├── pkg/
+│   ├── kubernetes/    # Kubernetes configuration parsing and analysis
+│   ├── storage/       # Storage backends (file, SQLite)
+│   └── output/        # Output formatters (HTML, timeline)
+├── sample_data/   # Sample Kubernetes configurations
+└── docs/          # Documentation website
 ```
 
-### Linux Capabilities
+## 📊 Version Information
 
-Linux capabilities provide fine-grained control over privileged operations. Containers with added capabilities have elevated privileges that may pose security risks. Particularly dangerous capabilities include: CAP_SYS_ADMIN, CAP_NET_ADMIN, CAP_SYS_PTRACE, and CAP_NET_RAW.
-
-```bash
-eolas analyze -n my-cluster --capabilities
-```
-
-### Host Namespaces
-
-Host namespaces provide containers with access to the host's resources, reducing isolation between containers and the host system. Each namespace type has specific security implications:
-
-- **hostPID**: Allows visibility of all processes on the host system
-- **hostIPC**: Enables shared memory access with the host and all containers
-- **hostNetwork**: Provides direct access to the host's network interfaces
-- **hostPorts**: Exposes ports directly on the host's network interfaces
+Get detailed build and dependency information:
 
 ```bash
-eolas analyze -n my-cluster --host-namespaces
+# Basic version
+eolas version
+
+# Detailed version with dependencies and features
+eolas version --detailed
 ```
 
-### Host Path Volumes
+## 🤝 Contributing
 
-hostPath volumes allow pods to mount files or directories from the host node's filesystem directly into the pod. This poses significant security risks as it enables containers to access and potentially modify sensitive areas of the host filesystem. Risks include:
+We welcome contributions! Please see our contributing guidelines and feel free to:
 
-- Read access to sensitive host files
-- Potential modification of host system files (when not mounted read-only)
-- Persistence across pod restarts, potentially allowing data exfiltration
-- Potential for privilege escalation through the host filesystem
+- Report bugs or request features via GitHub Issues
+- Submit pull requests for improvements
+- Share feedback and suggestions
 
-```bash
-eolas analyze -n my-cluster --host-path
-```
+## 📄 License
 
-### Combined Security Analysis
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-Run all security checks at once using the `--security` flag:
+## 🔗 Links
 
-```bash
-eolas analyze -n my-cluster --security
-```
+- **GitHub Repository**: [https://github.com/raesene/eolas](https://github.com/raesene/eolas)
+- **Documentation**: [GitHub Pages Documentation](https://raesene.github.io/eolas)
+- **Releases**: [GitHub Releases](https://github.com/raesene/eolas/releases)
 
-## HTML Reports
+---
 
-Eolas can generate interactive HTML reports with all analysis results. These reports include:
-
-- Overview dashboard with resource counts and security findings
-- Tabbed interface for easy navigation between different analysis types
-- Color-coded tables for better visualization of security issues
-- Responsive design that works on all devices
-- Embedded CSS and JavaScript (no external dependencies)
-
-Generate HTML reports using the `--html` flag:
-
-```bash
-# Generate a basic HTML report
-eolas analyze -n my-cluster --html -o report.html
-
-# Generate a comprehensive security report
-eolas analyze -n my-cluster --security --html -o security-report.html
-```
-
-The HTML reports are self-contained single files that can be easily shared and viewed in any web browser.
-
-## Releases
-
-The project uses GitHub Actions with GoReleaser to automatically build and publish releases. When a new tag is pushed, GoReleaser will build binaries for multiple platforms and publish them as a GitHub release.
-
-To create a new release:
-
-```bash
-# Update code and commit changes
-git commit -am "Your changes"
-
-# Tag a new version
-git tag -a v0.1.0 -m "First release"
-
-# Push tag to GitHub
-git push origin v0.1.0
-```
-
-The GitHub Action will automatically build and publish the release.
+*Eolas (pronounced "oh-las") is an Irish word meaning "knowledge" or "information" - fitting for a tool designed to provide insights into your Kubernetes configurations.*

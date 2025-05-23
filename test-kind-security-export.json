@@ -1,0 +1,212 @@
+{
+  "capability_containers": [
+    {
+      "Name": "kindnet-cni",
+      "Namespace": "kube-system",
+      "Kind": "DaemonSet",
+      "PodName": "kindnet",
+      "Capabilities": [
+        "NET_RAW",
+        "NET_ADMIN"
+      ]
+    },
+    {
+      "Name": "coredns",
+      "Namespace": "kube-system",
+      "Kind": "Deployment",
+      "PodName": "coredns",
+      "Capabilities": [
+        "NET_BIND_SERVICE"
+      ]
+    }
+  ],
+  "config_id": "test-kind",
+  "config_name": "test-kind",
+  "exported_at": "2025-05-23T10:45:02.387258+01:00",
+  "host_namespace_workloads": [
+    {
+      "Name": "kindnet",
+      "Namespace": "kube-system",
+      "Kind": "DaemonSet",
+      "HostPID": false,
+      "HostIPC": false,
+      "HostNetwork": true,
+      "HostPorts": null,
+      "ContainerNames": [
+        "kindnet-cni"
+      ]
+    },
+    {
+      "Name": "kube-proxy",
+      "Namespace": "kube-system",
+      "Kind": "DaemonSet",
+      "HostPID": false,
+      "HostIPC": false,
+      "HostNetwork": true,
+      "HostPorts": null,
+      "ContainerNames": [
+        "kube-proxy"
+      ]
+    },
+    {
+      "Name": "etcd-kind-control-plane",
+      "Namespace": "kube-system",
+      "Kind": "Pod",
+      "HostPID": false,
+      "HostIPC": false,
+      "HostNetwork": true,
+      "HostPorts": null,
+      "ContainerNames": [
+        "etcd"
+      ]
+    },
+    {
+      "Name": "kube-apiserver-kind-control-plane",
+      "Namespace": "kube-system",
+      "Kind": "Pod",
+      "HostPID": false,
+      "HostIPC": false,
+      "HostNetwork": true,
+      "HostPorts": null,
+      "ContainerNames": [
+        "kube-apiserver"
+      ]
+    },
+    {
+      "Name": "kube-controller-manager-kind-control-plane",
+      "Namespace": "kube-system",
+      "Kind": "Pod",
+      "HostPID": false,
+      "HostIPC": false,
+      "HostNetwork": true,
+      "HostPorts": null,
+      "ContainerNames": [
+        "kube-controller-manager"
+      ]
+    },
+    {
+      "Name": "kube-scheduler-kind-control-plane",
+      "Namespace": "kube-system",
+      "Kind": "Pod",
+      "HostPID": false,
+      "HostIPC": false,
+      "HostNetwork": true,
+      "HostPorts": null,
+      "ContainerNames": [
+        "kube-scheduler"
+      ]
+    }
+  ],
+  "host_path_volumes": [
+    {
+      "Name": "kindnet",
+      "Namespace": "kube-system",
+      "Kind": "DaemonSet",
+      "HostPaths": [
+        "/etc/cni/net.d",
+        "/run/xtables.lock",
+        "/lib/modules"
+      ],
+      "ReadOnly": [
+        false,
+        false,
+        true
+      ]
+    },
+    {
+      "Name": "kube-proxy",
+      "Namespace": "kube-system",
+      "Kind": "DaemonSet",
+      "HostPaths": [
+        "/run/xtables.lock",
+        "/lib/modules"
+      ],
+      "ReadOnly": [
+        false,
+        true
+      ]
+    },
+    {
+      "Name": "etcd-kind-control-plane",
+      "Namespace": "kube-system",
+      "Kind": "Pod",
+      "HostPaths": [
+        "/etc/kubernetes/pki/etcd",
+        "/var/lib/etcd"
+      ],
+      "ReadOnly": [
+        false,
+        false
+      ]
+    },
+    {
+      "Name": "kube-apiserver-kind-control-plane",
+      "Namespace": "kube-system",
+      "Kind": "Pod",
+      "HostPaths": [
+        "/etc/ssl/certs",
+        "/etc/ca-certificates",
+        "/etc/kubernetes/pki",
+        "/usr/local/share/ca-certificates",
+        "/usr/share/ca-certificates"
+      ],
+      "ReadOnly": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "Name": "kube-controller-manager-kind-control-plane",
+      "Namespace": "kube-system",
+      "Kind": "Pod",
+      "HostPaths": [
+        "/etc/ssl/certs",
+        "/etc/ca-certificates",
+        "/usr/libexec/kubernetes/kubelet-plugins/volume/exec",
+        "/etc/kubernetes/pki",
+        "/etc/kubernetes/controller-manager.conf",
+        "/usr/local/share/ca-certificates",
+        "/usr/share/ca-certificates"
+      ],
+      "ReadOnly": [
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "Name": "kube-scheduler-kind-control-plane",
+      "Namespace": "kube-system",
+      "Kind": "Pod",
+      "HostPaths": [
+        "/etc/kubernetes/scheduler.conf"
+      ],
+      "ReadOnly": [
+        true
+      ]
+    }
+  ],
+  "privileged_containers": [
+    {
+      "Name": "kube-proxy",
+      "Namespace": "kube-system",
+      "Kind": "DaemonSet",
+      "PodName": "kube-proxy"
+    }
+  ],
+  "security_summary": {
+    "total_findings": 15,
+    "privileged_count": 1,
+    "capability_count": 2,
+    "host_namespace_count": 6,
+    "host_path_count": 6
+  },
+  "timestamp": "2025-05-23T10:28:10.0949264+01:00"
+}
