@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	listStorageDir string
-	listUseHomeDir bool
+	listStorageDir     string
+	listUseHomeDir     bool
+	listStorageBackend string
 )
 
 var listCmd = &cobra.Command{
@@ -19,6 +20,12 @@ var listCmd = &cobra.Command{
 	Short: "List stored Kubernetes cluster configurations",
 	Long:  `List all Kubernetes cluster configurations that have been ingested and stored.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Validate storage backend
+		if err := storage.ValidateBackend(listStorageBackend); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
 		// Determine storage directory
 		var storeDir string
 		if listStorageDir != "" {
@@ -37,11 +44,19 @@ var listCmd = &cobra.Command{
 			storeDir = ".eolas"
 		}
 
-		store, err := storage.NewFileStore(storeDir)
+		// Create storage backend
+		storageConfig := storage.StorageConfig{
+			Backend:    storage.Backend(listStorageBackend),
+			StorageDir: storeDir,
+			UseHomeDir: listUseHomeDir,
+		}
+
+		store, err := storage.NewStore(storageConfig)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error accessing storage: %v\n", err)
 			os.Exit(1)
 		}
+		defer store.Close()
 
 		configs, err := store.ListConfigs()
 		if err != nil {
@@ -54,7 +69,7 @@ var listCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("Stored configurations in %s:\n", storeDir)
+		fmt.Printf("Stored configurations (%s backend) in %s:\n", listStorageBackend, storeDir)
 		for _, config := range configs {
 			fmt.Printf("  - %s\n", config)
 		}
@@ -65,4 +80,5 @@ func init() {
 	rootCmd.AddCommand(listCmd)
 	listCmd.Flags().StringVarP(&listStorageDir, "storage-dir", "s", "", "Directory where configurations are stored (defaults to .eolas in home directory)")
 	listCmd.Flags().BoolVarP(&listUseHomeDir, "use-home", "", true, "Use .eolas directory in user's home directory")
+	listCmd.Flags().StringVar(&listStorageBackend, "backend", "file", "Storage backend to use (file, sqlite)")
 }
